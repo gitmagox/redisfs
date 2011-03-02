@@ -20,7 +20,7 @@
  * numeric identifier - from that we store the meta-data of the entry
  * itself inside redis keys.
  *
- *  For example the file "/etc/passwd" might have the identifier "4".
+ *  For example the file "/etc/passwd" might have the identifier "6".
  * which would lead to keys such as:
  *
  * SKX:INODE:6:NAME   => "passwd"
@@ -33,6 +33,9 @@
  * SKX:INODE:6:CTIME  => "1234567"
  * SKX:INODE:6:MTIME  => "1234567"
  *
+ *  (Here "SKX:" is the key-prefix.  We need to allow this such that
+ * more than one filesystem may be mounted against a single redis-server.)
+ *
  *  Each directory created will have references to their contents
  * stored in a SET named after the directory.
  *
@@ -41,9 +44,7 @@
  *
  *   SKX:/ -> [ 6, 7 ]
  *
- *  Here you see each key is prefixed with "SKX" - this is configurable
- * on a per-filesystem basis to allow multiple mounts against the same
- * server.
+ * </overview>
  *
  */
 
@@ -75,16 +76,15 @@
 
 
 /**
- * The path the filesystem will be mounted at.
+ * The mount-point of the filesystem.
+ *
  */
-char _g_mount[200] = { "/tmp/redis" };
+char _g_mount[200] = { "/mnt/redis" };
 
 
 /**
  * Global prefix for all keys we set inside redis.
  *
- * This is configurable so that you can have multiple filesystems
- * running against the same host.
  */
 char _g_prefix[10] = { "skx" };
 
@@ -112,6 +112,14 @@ char _g_redis_host[100] = { "localhost" };
  * Are we running with --debug in play?
  */
 int _g_debug = 0;
+
+
+/**
+ * Is our file-system (intentionally) read-only?
+ */
+int _g_read_only = 0;
+
+
 
 
 
@@ -173,8 +181,6 @@ void *
 fs_init()
 {
     pthread_mutex_init(&_g_lock, NULL);
-
-    redis_alive();
 
     return 0;
 }
@@ -240,6 +246,16 @@ remove_inode(int inode)
 
     int i = 0;
 
+
+    /**
+     * Can't happen.
+     */
+    if (inode < 0)
+    {
+        fprintf(stderr, "Tried to free an unset inode.\n");
+        return;
+    }
+
     redis_alive();
 
     while (names[i] != NULL)
@@ -278,6 +294,14 @@ find_inode(const char *path)
         freeReplyObject(reply);
         if (val != -1)
             return val;
+        else
+        {
+          /**
+           * Avoid a future cache failure.
+           */
+            reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, path);
+            freeReplyObject(reply);
+        }
     }
 
   /**
@@ -351,6 +375,8 @@ is_directory(const char *path)
     if (_g_debug)
         fprintf(stderr, "is_directory(%s)\n", path);
 
+    redis_alive();
+
   /**
    * Find the inode.
    */
@@ -390,10 +416,13 @@ fs_readdir(const char *path,
 {
     redisReply *reply = NULL;
     int i;
+
     pthread_mutex_lock(&_g_lock);
 
     if (_g_debug)
         fprintf(stderr, "fs_readdir(%s)\n", path);
+
+    redis_alive();
 
     /**
      * Add the filesystem entries which always exist.
@@ -590,10 +619,19 @@ fs_mkdir(const char *path, mode_t mode)
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_mkdir(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * We need to create a new INODE number & entry.
@@ -667,6 +705,15 @@ fs_rmdir(const char *path)
     if (_g_debug)
         fprintf(stderr, "fs_rmdir(%s);\n", path);
 
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
     redis_alive();
 
 
@@ -676,7 +723,6 @@ fs_rmdir(const char *path)
     reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
-
         if (reply->elements > 0)
         {
             freeReplyObject(reply);
@@ -737,12 +783,21 @@ fs_write(const char *path,
 
     pthread_mutex_lock(&_g_lock);
 
+    if (_g_debug)
+        fprintf(stderr, "fs_write(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
     redis_alive();
 
     int inode = find_inode(path);
-
-    if (_g_debug)
-        fprintf(stderr, "fs_write(%s);\n", path);
 
     /**
      * Simplest case first.
@@ -859,7 +914,7 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
         struct fuse_file_info *fi)
 {
     redisReply *reply = NULL;
-    int sz;
+    size_t sz;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -885,7 +940,7 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     /**
      * Get the current file size.
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE %d",
+    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE",
                          _g_prefix, inode, size);
     sz = atoi(reply->str);
     freeReplyObject(reply);
@@ -898,7 +953,11 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     /**
      * Copy the data into the callee's buffer.
      */
-    memcpy(buf, reply->str + offset, size);
+    if (sz < size)
+        size = sz;
+
+    if (size > 0)
+        memcpy(buf, reply->str + offset, size);
 
     freeReplyObject(reply);
 
@@ -935,10 +994,19 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_create(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * We need to create a new INODE number & entry.
@@ -1008,10 +1076,19 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_chown(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * To remove the entry we need to :
@@ -1062,10 +1139,19 @@ fs_chmod(const char *path, mode_t mode)
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_chmod(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * To remove the entry we need to :
@@ -1086,6 +1172,64 @@ fs_chmod(const char *path, mode_t mode)
     reply =
         redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d", _g_prefix, inode,
                      mode);
+    freeReplyObject(reply);
+
+    /**
+     * All done.
+     */
+    pthread_mutex_unlock(&_g_lock);
+    return 0;
+
+}
+
+
+/**
+ * Change the access time of a file.
+ */
+static int
+fs_utimens(const char *path, const struct timespec tv[2])
+{
+    int inode;
+    redisReply *reply = NULL;
+
+    pthread_mutex_lock(&_g_lock);
+
+    if (_g_debug)
+        fprintf(stderr, "fs_utimens(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
+
+    /**
+     *
+     * 1/2 Find the inode for this entry.
+     *
+     */
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
+    /**
+     * [2/2] Change the time
+     */
+    reply =
+        redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d", _g_prefix, inode,
+                     tv[0].tv_sec);
+    freeReplyObject(reply);
+    reply =
+        redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d", _g_prefix, inode,
+                     tv[1].tv_sec);
     freeReplyObject(reply);
 
     /**
@@ -1123,6 +1267,15 @@ fs_unlink(const char *path)
 
     if (_g_debug)
         fprintf(stderr, "fs_unlink(%s);\n", path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
 
     redis_alive();
 
@@ -1175,10 +1328,19 @@ fs_rename(const char *old, const char *path)
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_rename(%s,%s);\n", old, path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * To rename the entry we need to :
@@ -1255,25 +1417,32 @@ fs_rename(const char *old, const char *path)
 /**
  * Truncate an entry.
  *
- * This just needs to remove the data and reset the size to zero.
- *
- *  TODO: Does it make more sense to call "remove" and "create" ?
- *        I guess the uid/gid/ctime will all need to be persisted - so no.
+ * This just needs to remove the data and reset the size to zero and the
+ * MTIME to "now".
  *
  */
 static int
 fs_truncate(const char *path, off_t size)
 {
-
     int inode;
     redisReply *reply = NULL;
 
     pthread_mutex_lock(&_g_lock);
 
-    redis_alive();
-
     if (_g_debug)
         fprintf(stderr, "fs_truncate(%s);\n", path);
+
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
 
     /**
      * Ensure we're working on a file, not a directory.
@@ -1304,15 +1473,14 @@ fs_truncate(const char *path, off_t size)
     freeReplyObject(reply);
 
     /**
-     * [3/3] Reset the size.
+     * [3/3] Reset the size & mtime.
      */
     reply =
         redisCommand(_g_redis, "SET %s:INODE:%d:SIZE 0", _g_prefix, inode);
     freeReplyObject(reply);
-
-    //
-    // TODO: Update mtime.
-    //
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                         _g_prefix, inode, time(NULL));
+    freeReplyObject(reply);
 
     pthread_mutex_unlock(&_g_lock);
     return 0;
@@ -1355,9 +1523,10 @@ usage(int argc, char *argv[])
     printf("\t--debug      - Launch with debugging information.\n");
     printf("\t--help       - Show this minimal help information.\n");
     printf("\t--host       - The hostname of the redis server [localhost]\n");
-    printf("\t--mount      - The directory to mount our filesystem under.\n");
+    printf
+        ("\t--mount      - The directory to mount our filesystem under [/mnt/redis].\n");
     printf("\t--port       - The port of the redis server [6389].\n");
-    printf("\t--prefix     - A string appended to Redis key names.\n");
+    printf("\t--prefix     - A string prepended to any Redis key names.\n");
     printf("\n");
 
     return 1;
@@ -1376,6 +1545,7 @@ static struct fuse_operations redisfs_operations = {
     .rmdir = fs_rmdir,
     .truncate = fs_truncate,
     .unlink = fs_unlink,
+    .utimens = fs_utimens,
     .write = fs_write,
 
 
@@ -1438,16 +1608,17 @@ main(int argc, char *argv[])
     {
         static struct option long_options[] = {
             {"debug", no_argument, 0, 'd'},
-            {"prefix", required_argument, 0, 'p'},
-            {"host", required_argument, 0, 's'},
-            {"port", required_argument, 0, 'P'},
-            {"mount", required_argument, 0, 'm'},
             {"help", no_argument, 0, 'h'},
+            {"host", required_argument, 0, 's'},
+            {"mount", required_argument, 0, 'm'},
+            {"port", required_argument, 0, 'P'},
+            {"prefix", required_argument, 0, 'p'},
+            {"read-only", no_argument, 0, 'r'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:dh", long_options,
+        c = getopt_long(argc, argv, "s:P:m:p:drh", long_options,
                         &option_index);
 
         /*
@@ -1463,6 +1634,9 @@ main(int argc, char *argv[])
             break;
         case 'P':
             _g_redis_port = atoi(optarg);
+            break;
+        case 'r':
+            _g_read_only = 1;
             break;
         case 's':
             snprintf(_g_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
@@ -1513,6 +1687,19 @@ main(int argc, char *argv[])
         fprintf(stderr, "Writing PID file failed\n");
         return -1;
     }
+
+    /**
+     * Show our options.
+     */
+    printf("Connecting to redis server %s:%d and mounting at %s.\n",
+           _g_redis_host, _g_redis_port, _g_mount);
+
+    /**
+     * If we're read-only say so.
+     */
+    if (_g_read_only)
+        printf("Filesystem is read-only.\n");
+
 
     /**
      * Launch fuse.
