@@ -1,7 +1,13 @@
 
-  *  The biggest omission is the handling of symlinks.
+  *  Need to add support for symlinks.  Mostly painless
+
+  *  Need to add/commit debian/
 
   *  We could probably cache more.
+
+  *  Performance could be improved by either batching up operations, or 
+    going ASYNC.  (Caveat: We use a global mutex because FUSE doesn't play
+    so well with ASYNC stuffs.  Investigate.)
 
 Steve
 --
