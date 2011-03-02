@@ -14,8 +14,8 @@ also has several useful abilities built-in, including:
   * hashes
   * lists.
 
-Using only a few primitives we can implement a filesystem, which is
-beautifully ready for replication.
+Using only key+value pairs, and the notion of a set, we can implement
+a simple filesystem, which is beautifully ready for replication.
 
 
 
