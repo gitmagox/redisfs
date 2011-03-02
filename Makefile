@@ -27,7 +27,7 @@ test:
 tidy:
 	cd ./src && make tidy clean
 
-install:
+install: all
 	cd ./src && make install
 
 
@@ -43,6 +43,7 @@ release: tidy clean
 	rm -rf $(DIST_PREFIX)/$(BASE)-$(VERSION)
 	rm -f $(DIST_PREFIX)/$(BASE)-$(VERSION).tar.gz
 	cp -R . $(DIST_PREFIX)/$(BASE)-$(VERSION)
+	rm -rf $(DIST_PREFIX)/$(BASE)-$(VERSION)/debian
 	find  $(DIST_PREFIX)/$(BASE)-$(VERSION) -name ".hg*" -print | xargs rm -rf
 	find  $(DIST_PREFIX)/$(BASE)-$(VERSION) -name ".release" -print | xargs rm -rf
 	cd $(DIST_PREFIX) && tar -cvf $(DIST_PREFIX)/$(BASE)-$(VERSION).tar $(BASE)-$(VERSION)/
