@@ -1,9 +1,7 @@
 
-  The biggest omission is the handling of symlinks.
+  *  The biggest omission is the handling of symlinks.
 
-  Also missing is the handling of "utimens" - which is annoying and
- gives alerts when using either "touch" or "rsync".  But is otherwise
- harmless.
+  *  We could probably cache more.
 
 Steve
 --
