@@ -1,0 +1,77 @@
+
+
+Introduction
+------------
+
+Redis is a high-performance key/value store which allows the setting
+and restoring of values from a memory-backed store.
+
+Intuitively it might seem that basing a filesystem around a simple
+key=value store isn't such a practical endeavour, but happily redis
+also has several useful abilities built-in, including:
+
+  * sets
+  * hashes
+  * lists.
+
+Using only a few primitives we can implement a filesystem, which is
+beautifully ready for replication.
+
+
+
+Storage
+-------
+
+This filesystem makes use of two of redis's abilities:
+
+  * KEY storage.
+  * SET storage.
+
+Our filesystem is built around the notion that a directory contains
+entries, and these entries are members of a set named upon the containing
+directory.
+
+For example consider the directory tree:
+
+  /mnt
+  /mnt/foo
+  /mnt/foo/README
+  /mnt/bar/
+  /mnt/bar/README
+
+Here we see a top-level directroy "/mnt" containing two-subdirectories,
+each of which contains a single file named README.
+
+How would we store that information in a Redis server?  Using sets.
+
+  SET("ENTRIES:/mnt")      = { "foo", "bar" )
+  SET("ENTRIES:/mnt/foo" ) = { "README" }
+  SET("ENTRIES:/mnt/bar" ) = { "README" }
+
+i.e. For each directory "$DIR" beneath our root we have entries
+stored in a SET named  "ENTRIES:$DIR".
+
+We can store meta-data in similar fashion.  For the file /mnt/foo/README
+we can create keys to store values:
+
+   FILE:UID:/mnt/foo/README = 0;
+   FILE:GID:/mnt/foo/README = 0;
+   FILE:ATIME:/mnt/foo/README = 1280526050
+   FILE:MTIME:/mnt/foo/README = 1280526050
+   ..
+   ..
+   FILE:SIZE:/mnt/foo/README  = 16384
+
+(In actual fact we add a unique prefix to each key, to allow you to
+mount multiple filesystems on the same host.)
+
+
+Getting Started
+---------------
+
+Download the code and run "make".
+
+Execute ./src/redisfs --help
+
+Steve
+--
