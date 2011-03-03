@@ -1128,6 +1128,33 @@ fs_readlink(const char *path, char *buf, size_t size)
 static int
 fs_open(const char *path, struct fuse_file_info *fi)
 {
+
+    int inode;
+    redisReply *reply = NULL;
+
+    pthread_mutex_lock(&_g_lock);
+
+    if (_g_debug)
+        fprintf(stderr, "fs_open(%s);\n", path);
+
+  /**
+   * Update the access time of a file.
+   */
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
+
+
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
+                         _g_prefix, inode, time(NULL));
+    freeReplyObject(reply);
+
+
+    pthread_mutex_unlock(&_g_lock);
+
     return 0;
 }
 
@@ -1417,6 +1444,31 @@ fs_utimens(const char *path, const struct timespec tv[2])
 static int
 fs_access(const char *path, int mode)
 {
+    int inode;
+    redisReply *reply = NULL;
+
+    pthread_mutex_lock(&_g_lock);
+
+    if (_g_debug)
+        fprintf(stderr, "fs_access(%s);\n", path);
+
+  /**
+   * Update the access time of a file.
+   */
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
+
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
+                         _g_prefix, inode, time(NULL));
+    freeReplyObject(reply);
+
+
+    pthread_mutex_unlock(&_g_lock);
+
     return 0;
 }
 
@@ -1720,10 +1772,10 @@ static struct fuse_operations redisfs_operations = {
 
 
     /*
-     *  FAKE
+     *  FAKE: Only update access-time.
      */
-    .open = fs_open,
     .access = fs_access,
+    .open = fs_open,
 
 
     /*
