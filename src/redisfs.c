@@ -237,16 +237,16 @@ remove_inode(int inode)
     redisReply *reply = NULL;
 
     char *names[] = {
-        "DEL %s:INODE:%d:NAME",
-        "DEL %s:INODE:%d:TYPE",
-        "DEL %s:INODE:%d:MODE",
-        "DEL %s:INODE:%d:GID",
-        "DEL %s:INODE:%d:UID",
-        "DEL %s:INODE:%d:ATIME",
-        "DEL %s:INODE:%d:CTIME",
-        "DEL %s:INODE:%d:MTIME",
-        "DEL %s:INODE:%d:SIZE",
-        "DEL %s:INODE:%d:DATA",
+        "DEL %s:INODE:%d:NAME", /* basename of file/dir */
+        "DEL %s:INODE:%d:TYPE", /* "FILE", "DIR", or "LINK" */
+        "DEL %s:INODE:%d:MODE", /* file mode */
+        "DEL %s:INODE:%d:GID",  /* GID of owner */
+        "DEL %s:INODE:%d:UID",  /* UID of owner */
+        "DEL %s:INODE:%d:ATIME",        /* access-time */
+        "DEL %s:INODE:%d:CTIME",        /* create time */
+        "DEL %s:INODE:%d:MTIME",        /* modification time */
+        "DEL %s:INODE:%d:SIZE", /* size of a file */
+        "DEL %s:INODE:%d:DATA", /* data stored in a file */
         NULL
     };
 
