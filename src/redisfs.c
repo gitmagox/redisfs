@@ -247,6 +247,8 @@ remove_inode(int inode)
         "DEL %s:INODE:%d:MTIME",        /* modification time */
         "DEL %s:INODE:%d:SIZE", /* size of a file */
         "DEL %s:INODE:%d:DATA", /* data stored in a file */
+        "DEL %s:INODE:%d:LINK", /* link-count */
+        "DEL %s:INODE:%d:TARGET",       /* destination of symlink */
         NULL
     };
 
@@ -551,6 +553,14 @@ fs_getattr(const char *path, struct stat *stbuf)
     freeReplyObject(reply);
 
     /**
+     * Link count.
+     */
+    reply = redisCommand(_g_redis, "GET %s:INODE:%d:LINK", _g_prefix, inode);
+    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
+        stbuf->st_nlink = atoi(reply->str);
+    freeReplyObject(reply);
+
+    /**
      *  Type
      */
     reply = redisCommand(_g_redis, "GET %s:INODE:%d:TYPE", _g_prefix, inode);
@@ -565,14 +575,15 @@ fs_getattr(const char *path, struct stat *stbuf)
         }
         freeReplyObject(r);
 
-        /**
-         * See TODO about symlinks.
-         */
-        stbuf->st_nlink = 1;
-
         if (strcmp(reply->str, "DIR") == 0)
         {
             stbuf->st_mode |= S_IFDIR;
+        }
+        else if (strcmp(reply->str, "LINK") == 0)
+        {
+            stbuf->st_mode |= S_IFLNK;
+            stbuf->st_nlink = 1;
+            stbuf->st_size = 0;
         }
         else if (strcmp(reply->str, "FILE") == 0)
         {
@@ -590,14 +601,6 @@ fs_getattr(const char *path, struct stat *stbuf)
         }
         else
         {
-            //
-            // TODO: Here we'd handle LINK
-            //
-            // NOTE: To do this we need to have SKX:INODE:X:REF
-            //       which is the ref-count.  Simples.
-            //
-            //       Until now we assume st_nlink == 1.
-            //
             if (_g_debug)
                 fprintf(stderr, "UNKNOWN ENTRY TYPE: %s\n", reply->str);
         }
@@ -685,6 +688,8 @@ fs_mkdir(const char *path, mode_t mode)
     freeReplyObject(reply);
     reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
                          _g_prefix, key, time(NULL));
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
     freeReplyObject(reply);
 
 
@@ -1061,7 +1066,8 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
                          _g_prefix, key, time(NULL));
     freeReplyObject(reply);
-
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
+    freeReplyObject(reply);
 
     free(parent);
     free(entry);
