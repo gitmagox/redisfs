@@ -118,6 +118,12 @@ int _g_debug = 0;
 
 
 /**
+ * Are we running with --fast in play?
+ */
+int _g_fast = 0;
+
+
+/**
  * Is our file-system (intentionally) read-only?
  */
 int _g_read_only = 0;
@@ -1133,10 +1139,18 @@ fs_open(const char *path, struct fuse_file_info *fi)
     int inode;
     redisReply *reply = NULL;
 
-    pthread_mutex_lock(&_g_lock);
-
     if (_g_debug)
         fprintf(stderr, "fs_open(%s);\n", path);
+
+
+    /**
+     * If we're running with --fast just return, and don't
+     * update the atime.
+     */
+    if ( _g_fast )
+      return 0;
+
+    pthread_mutex_lock(&_g_lock);
 
   /**
    * Update the access time of a file.
@@ -1448,10 +1462,18 @@ fs_access(const char *path, int mode)
     int inode;
     redisReply *reply = NULL;
 
-    pthread_mutex_lock(&_g_lock);
-
     if (_g_debug)
         fprintf(stderr, "fs_access(%s);\n", path);
+
+    /**
+     * If we're running with --fast just return, and don't
+     * update the atime.
+     */
+    if ( _g_fast )
+      return 0;
+
+
+    pthread_mutex_lock(&_g_lock);
 
   /**
    * Update the access time of a file.
@@ -1831,6 +1853,7 @@ main(int argc, char *argv[])
     {
         static struct option long_options[] = {
             {"debug", no_argument, 0, 'd'},
+            {"fast", no_argument, 0, 'f'},
             {"help", no_argument, 0, 'h'},
             {"host", required_argument, 0, 's'},
             {"mount", required_argument, 0, 'm'},
@@ -1842,7 +1865,7 @@ main(int argc, char *argv[])
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:drhv", long_options,
+        c = getopt_long(argc, argv, "s:P:m:p:drhvf", long_options,
                         &option_index);
 
         /*
@@ -1863,6 +1886,9 @@ main(int argc, char *argv[])
             break;
         case 'P':
             _g_redis_port = atoi(optarg);
+            break;
+        case 'f':
+            _g_fast = 1;
             break;
         case 'r':
             _g_read_only = 1;
