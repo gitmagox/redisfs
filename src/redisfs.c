@@ -1619,13 +1619,13 @@ static struct fuse_operations redisfs_operations = {
     .mkdir = fs_mkdir,
     .read = fs_read,
     .readdir = fs_readdir,
+    .readlink = fs_readlink,
     .rename = fs_rename,
     .rmdir = fs_rmdir,
     .truncate = fs_truncate,
     .unlink = fs_unlink,
     .utimens = fs_utimens,
     .write = fs_write,
-    .readlink = fs_readlink,
 
 
     /*
