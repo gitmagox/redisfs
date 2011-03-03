@@ -1614,11 +1614,12 @@ main(int argc, char *argv[])
             {"port", required_argument, 0, 'P'},
             {"prefix", required_argument, 0, 'p'},
             {"read-only", no_argument, 0, 'r'},
+            {"version", no_argument, 0, 'v'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:drh", long_options,
+        c = getopt_long(argc, argv, "s:P:m:p:drhv", long_options,
                         &option_index);
 
         /*
@@ -1629,6 +1630,11 @@ main(int argc, char *argv[])
 
         switch (c)
         {
+        case 'v':
+            fprintf(stderr,
+                    "redisfs - version %.01f - <http://www.steve.org.uk/Software/redisfs>\n",
+                    VERSION);
+            exit(0);
         case 'p':
             snprintf(_g_prefix, sizeof(_g_prefix) - 1, "%s", optarg);
             break;
