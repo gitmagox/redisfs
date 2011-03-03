@@ -36,10 +36,10 @@ For example consider the directory tree:
   /mnt/redis/foo/
   /mnt/redis/README
 
-Here we see a top-level directroy "/mnt/redis" containing a single
+Here we see a top-level directory "/mnt/redis" containing a single
 sub-directory "foo" and a file "README".
 
-For each entry, be it a file or a directory, we have a unique identifer
+For each entry, be it a file or a directory, we have a unique identifier
 which we've called an "INODE number".  This may be used to store
 retrieve, and search for information:
 
