@@ -180,6 +180,9 @@ redis_alive()
 void *
 fs_init()
 {
+    if (_g_debug)
+        fprintf(stderr, "fs_init()\n");
+
     pthread_mutex_init(&_g_lock, NULL);
 
     return 0;
@@ -194,6 +197,9 @@ fs_init()
 void
 fs_destroy()
 {
+    if (_g_debug)
+        fprintf(stderr, "fs_destroy()\n");
+
     pthread_mutex_destroy(&_g_lock);
 }
 
@@ -1091,9 +1097,9 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
     redis_alive();
 
     /**
-     * To remove the entry we need to :
+     * To change the ownership of this file we need to :
      *
-     * 1/3 Find the inode for this entry.
+     * [1/4] Find the inode for this entry.
      *
      */
     inode = find_inode(path);
@@ -1104,7 +1110,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
     }
 
     /**
-     * [2/3] Change the UID
+     * [2/4] Change the UID
      */
     reply =
         redisCommand(_g_redis, "SET %s:INODE:%d:UID %d", _g_prefix, inode,
@@ -1112,12 +1118,20 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
     freeReplyObject(reply);
 
     /**
-     * [3/3] Change the GID
+     * [3/4] Change the GID
      */
     reply =
         redisCommand(_g_redis, "SET %s:INODE:%d:GID %d", _g_prefix, inode,
                      gid);
     freeReplyObject(reply);
+
+    /**
+     * [4/4] change the mtime.
+     */
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                         _g_prefix, inode, time(NULL));
+    freeReplyObject(reply);
+
 
     /**
      * All done.
@@ -1154,9 +1168,9 @@ fs_chmod(const char *path, mode_t mode)
     redis_alive();
 
     /**
-     * To remove the entry we need to :
+     * To change the owner of this file we need to:
      *
-     * 1/2 Find the inode for this entry.
+     * [1/3] Find the inode for this entry.
      *
      */
     inode = find_inode(path);
@@ -1167,11 +1181,18 @@ fs_chmod(const char *path, mode_t mode)
     }
 
     /**
-     * [2/2] Change the mode
+     * [2/3] Change the mode
      */
     reply =
         redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d", _g_prefix, inode,
                      mode);
+    freeReplyObject(reply);
+
+    /**
+     * [3/3] Change the mtime.
+     */
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                         _g_prefix, inode, time(NULL));
     freeReplyObject(reply);
 
     /**
