@@ -13,8 +13,9 @@
 /**
  *  This filesystem is written using FUSE and is pretty basic.  There
  * is support for all the common operations which you might expect
- * with the single exception that symbolic links are not currently
- * present - but planned for the future.
+ * with the exception that hard-links are not supported.
+ *
+ * (Symbolic links / symlinks are supported though.)
  *
  *  Each file/directory which is created is allocated a unique
  * numeric identifier - from that we store the meta-data of the entry
