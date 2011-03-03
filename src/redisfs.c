@@ -980,6 +980,96 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 
 
 /**
+ * Create a symlink
+ */
+static int
+fs_symlink(const char *target, const char *path)
+{
+
+    redisReply *reply = NULL;
+    char *parent = NULL;
+    char *entry = NULL;
+    int key = 0;
+
+    pthread_mutex_lock(&_g_lock);
+
+    if (_g_debug)
+        fprintf(stderr, "fs_symlink(target:%s -> %s);\n", target, path);
+
+    /**
+     * If read-only mode is set this must fail.
+     */
+    if (_g_read_only)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
+    redis_alive();
+
+    /**
+     * We need to create a new INODE number & entry.
+     *
+     * Once that is done we can create the new entry
+     * in the set for the parent directory.
+     */
+    parent = get_parent(path);
+    entry = get_basename(path);
+    key = get_next_inode();
+
+
+    /**
+     * Add the entry to the parent directory.
+     */
+    reply = redisCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, key);
+    freeReplyObject(reply);
+
+    /**
+     * Now populate the new entry.
+     */
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s",
+                         _g_prefix, key, entry);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:TYPE LINK",
+                         _g_prefix, key);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:TARGET %s",
+                         _g_prefix, key, target);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d",
+                         _g_prefix, key, 0444);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:UID %d",
+                         _g_prefix, key, fuse_get_context()->uid);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:GID %d",
+                         _g_prefix, key, fuse_get_context()->gid);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
+                         _g_prefix, key, 0);
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:CTIME %d",
+                         _g_prefix, key, time(NULL));
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                         _g_prefix, key, time(NULL));
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
+                         _g_prefix, key, time(NULL));
+    freeReplyObject(reply);
+    reply = redisCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
+    freeReplyObject(reply);
+
+
+    free(parent);
+    free(entry);
+
+    pthread_mutex_unlock(&_g_lock);
+    return 0;
+}
+
+
+/**
  * Read the target of a symlink.
  */
 static int
@@ -1622,6 +1712,7 @@ static struct fuse_operations redisfs_operations = {
     .readlink = fs_readlink,
     .rename = fs_rename,
     .rmdir = fs_rmdir,
+    .symlink = fs_symlink,
     .truncate = fs_truncate,
     .unlink = fs_unlink,
     .utimens = fs_utimens,
