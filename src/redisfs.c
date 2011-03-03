@@ -32,6 +32,8 @@
  * SKX:INODE:6:ATIME  => "1234567"
  * SKX:INODE:6:CTIME  => "1234567"
  * SKX:INODE:6:MTIME  => "1234567"
+ * SKX:INODE:6:LINK   => 1   [symlink count]
+ * SKX:INODE:6:TARGET => ""   [symlink destination]
  *
  *  (Here "SKX:" is the key-prefix.  We need to allow this such that
  * more than one filesystem may be mounted against a single redis-server.)
@@ -977,6 +979,55 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 
+/**
+ * Read the target of a symlink.
+ */
+static int
+fs_readlink(const char *path, char *buf, size_t size)
+{
+    int inode;
+    redisReply *reply = NULL;
+
+    pthread_mutex_lock(&_g_lock);
+
+    if (_g_debug)
+        fprintf(stderr, "fs_readlink(%s);\n", path);
+
+    redis_alive();
+
+    /**
+     * To resolve the symlink we must:
+     *
+     * [1/2] Find the inode for this entry.
+     *
+     */
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
+    /**
+     * [2/2] Lookup the "TARGET" data item.
+     */
+    reply = redisCommand(_g_redis, "GET %s:INODE:%d:TARGET",
+                         _g_prefix, inode);
+
+    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING) &&
+        (reply->str != NULL))
+    {
+        strcpy(buf, (char *)reply->str);
+        freeReplyObject(reply);
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
+    freeReplyObject(reply);
+    pthread_mutex_unlock(&_g_lock);
+
+    return (-ENOENT);
+}
+
 
 /**
  * This cheats and always returns true.
@@ -1574,6 +1625,7 @@ static struct fuse_operations redisfs_operations = {
     .unlink = fs_unlink,
     .utimens = fs_utimens,
     .write = fs_write,
+    .readlink = fs_readlink,
 
 
     /*
