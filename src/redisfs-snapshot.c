@@ -109,9 +109,88 @@ redis_alive()
 }
 
 
+/**
+ * Clone all keys with the given prefix.
+ *
+ * For each key we find we need to generate teh new name, and copy the
+ * contents.
+ *
+ */
 void
 clone_keys(char *prefix, char *new_prefix)
 {
+    redisReply *reply = NULL;
+    int additional;
+
+
+    /**
+     * We need to make sure that we have free space to store
+     * the key names.
+     */
+    additional = strlen(new_prefix) - strlen(prefix) + 1;
+
+
+    /**
+     * Ensure we're alive.
+     */
+    redis_alive();
+
+
+    /**
+     * Wildcard search on the common-prefix.
+     */
+    reply = redisCommand(_g_redis, "KEYS %s*", prefix);
+
+    if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
+    {
+        int i;
+
+        if (_g_debug)
+            fprintf(stderr, "Found %d keys\n", (int)reply->elements);
+
+        for (i = 0; i < reply->elements; i++)
+        {
+            redisReply *r = NULL;
+
+          /**
+           * The name of the current key.
+           */
+            char *old_key = reply->element[i]->str;
+
+            if (_g_debug)
+                fprintf(stderr, "Found key: %s\n", old_key);
+
+          /**
+           * The name of the new key.
+           */
+            char *new_key = malloc(reply->element[i]->len + additional);
+            sprintf(new_key, "%s%s", new_prefix, old_key + strlen(prefix));
+
+            if (_g_debug)
+                fprintf(stderr, "\tcopying to: %s\n", new_key);
+
+
+            /**
+             * Get the type.
+             */
+            r = redisCommand(_g_redis, "TYPE %s", old_key);
+            if (r != NULL)
+            {
+                if (_g_debug)
+                    fprintf(stderr, "\tkey is a: %s\n", r->str);
+            }
+            freeReplyObject(r);
+
+            /**
+             * Free the keyname.
+             */
+            free(new_key);
+
+        }
+    }
+
+    freeReplyObject(reply);
+
 }
 
 
