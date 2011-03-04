@@ -19,21 +19,31 @@ may potentially be remote.
 .B \-d, \-\-debug
 Enable full debug output, but from FUSE and from the program itself.
 
+.TP
+.B \-f, \-\-fast
+Enable "fast" mode, which avoids updating access-times on open/read operations.
+
+.TP
 .B \-h, \-\-help
 Displays a help message and exits.
 
+.TP
 .B \-s, \-\-host
 Specify a remote hostname to connect to.  (Default is "localhost").
 
+.TP
 .B \-m, \-\-mount
 Specify the local directory to mount the filesystem at.  (Default is "/mnt/redis").
 
+.TP
 .B \-P, \-\-port
 Specify the port to connect to a redis-server upon.  (Default is 6379).
 
+.TP
 .B \-p, \-\-prefix
 Specify a prefix to use for all Redis keys.  (Default is "skx:").
 
+.TP
 .B \-r, \-\-read-only
 Specify that the filesystem is read-only, all write-attempts will fail.
 
