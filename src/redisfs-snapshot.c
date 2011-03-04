@@ -192,7 +192,7 @@ clone_keys(char *prefix, char *new_prefix)
                      */
                     cur = redisCommand(_g_redis, "GET %s", old_key);
 
-                    if ( (cur != NULL) && ( cur->type == REDIS_REPLY_STRING ) )
+                    if ((cur != NULL) && (cur->type == REDIS_REPLY_STRING))
                     {
                       /**
                        * Set the value in the copied key.
@@ -203,13 +203,15 @@ clone_keys(char *prefix, char *new_prefix)
                     }
                     freeReplyObject(cur);
                 }
-                else if ( strcmp( r->str, "set" ) == 0 )
-                  {
-                  }
+                else if (strcmp(r->str, "set") == 0)
+                {
+                }
                 else
-                  {
-                    fprintf(stderr, "The key type '%s' is not one we expect to find.\nAborting\n", r->str );
-                  }
+                {
+                    fprintf(stderr,
+                            "The key type '%s' is not one we expect to find.\nAborting\n",
+                            r->str);
+                }
 
             }
             freeReplyObject(r);
