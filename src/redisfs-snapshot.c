@@ -7,3 +7,215 @@
  * http://steve.org.uk/
  *
  */
+
+
+
+/**
+ *  Our filesystem is written using FUSE and is pretty basic.
+ *
+ *  All files, directories, and meta-data are stored in a series of
+ * keys with a prefix.
+ *
+ *  To create a new snapshot we merely clone each key & value which
+ * contains our prefix.
+ *
+ */
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <getopt.h>
+#include <stdarg.h>
+
+
+#include "hiredis.h"
+
+
+
+/**
+ * Handle to the redis server.
+ */
+redisContext *_g_redis = NULL;
+
+
+/**
+ * The host and port of the redis server we're connecting to.
+ */
+int _g_redis_port = 6379;
+char _g_redis_host[100] = { "localhost" };
+
+
+/**
+ * Are we running with --debug in play?
+ */
+int _g_debug = 0;
+
+/**
+ * The prefixes we copy from & to.
+ */
+char _g_old_prefix[20] = { "skx" };
+char _g_new_prefix[20] = { "snapshot" };
+
+
+
+/**
+ * If our service isn't alive then connect to it.
+ */
+void
+redis_alive()
+{
+    struct timeval timeout = { 1, 5000000 };    // 1.5 seconds
+    redisReply *reply = NULL;
+
+    /**
+     * If we have a handle see if it is alive.
+     */
+    if (_g_redis != NULL)
+    {
+        reply = redisCommand(_g_redis, "PING");
+
+        if ((reply != NULL) &&
+            (reply->str != NULL) && (strcmp(reply->str, "PONG") == 0))
+        {
+            freeReplyObject(reply);
+            return;
+        }
+        else
+        {
+            if (reply != NULL)
+                freeReplyObject(reply);
+        }
+    }
+
+    /**
+     * OK we have no handle, create a connection to the server.
+     */
+    _g_redis = redisConnectWithTimeout(_g_redis_host, _g_redis_port, timeout);
+    if (_g_redis == NULL)
+    {
+        fprintf(stderr, "Failed to connect to redis on [%s:%d].\n",
+                _g_redis_host, _g_redis_port);
+        exit(1);
+    }
+    else
+    {
+        if (_g_debug)
+            fprintf(stderr, "Reconnected to redis server on [%s:%d]\n",
+                    _g_redis_host, _g_redis_port);
+    }
+}
+
+
+void
+clone_keys(char *prefix, char *new_prefix)
+{
+}
+
+
+
+/**
+ * Show minimal usage information.
+ */
+int
+usage(int argc, char *argv[])
+{
+    printf("%s - Filesystem based upon FUSE\n", argv[0]);
+    printf("\nOptions:\n\n");
+    printf("\t--debug      - Launch with debugging information.\n");
+    printf("\t--help       - Show this minimal help information.\n");
+    printf("\t--host       - The hostname of the redis server [localhost]\n");
+    printf("\t--port       - The port of the redis server [6389].\n");
+    printf("\t--from       - The prefix we're copying from.\n");
+    printf("\t--to         - The prefix we're copying to.\n");
+    printf("\n");
+
+    return 1;
+}
+
+/**
+ *  Entry point to our code.
+ *
+ *  We support minimal command line parsing, and mostly just perform tests
+ * and checks before launching ourself under fuse control.
+ *
+ */
+int
+main(int argc, char *argv[])
+{
+    int c;
+
+    /**
+     * Parse any command line arguments we might have.
+     */
+    while (1)
+    {
+        static struct option long_options[] = {
+            {"debug", no_argument, 0, 'd'},
+            {"help", no_argument, 0, 'h'},
+            {"host", required_argument, 0, 's'},
+            {"port", required_argument, 0, 'P'},
+            {"from", required_argument, 0, 'f'},
+            {"to", required_argument, 0, 't'},
+            {"version", no_argument, 0, 'v'},
+            {0, 0, 0, 0}
+        };
+        int option_index = 0;
+
+        c = getopt_long(argc, argv, "s:P:f:t:hdv", long_options, &option_index);
+
+        /*
+         * Detect the end of the options.
+         */
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+        case 'v':
+            fprintf(stderr,
+                    "redisfs-snapshot - version %.01f - <http://www.steve.org.uk/Software/redisfs>\n",
+                    VERSION);
+            exit(0);
+
+        case 'P':
+            _g_redis_port = atoi(optarg);
+            break;
+        case 's':
+            snprintf(_g_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
+            break;
+        case 'd':
+            _g_debug += 1;
+            break;
+        case 'f':
+            snprintf(_g_old_prefix, sizeof(_g_old_prefix) - 1, "%s", optarg);
+            break;
+        case 't':
+            snprintf(_g_new_prefix, sizeof(_g_new_prefix) - 1, "%s", optarg);
+            break;
+        case 'h':
+            return (usage(argc, argv));
+            break;
+        default:
+            abort();
+        }
+    }
+
+    /**
+     * Show our options.
+     */
+    printf("Connecting to redis server %s:%d.\n",
+           _g_redis_host, _g_redis_port);
+
+    printf("Cloning all keys with prefix '%s' -> '%s'\n",
+           _g_old_prefix, _g_new_prefix);
+
+    /**
+     * Clone our keys
+     */
+    clone_keys(_g_old_prefix, _g_new_prefix);
+
+    return 0;
+}
