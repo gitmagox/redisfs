@@ -7,7 +7,7 @@
 #  Used for "make release".
 #
 DIST_PREFIX = ${TMP}
-VERSION     = 0.4
+VERSION     = 0.5
 BASE        = redisfs
 
 
