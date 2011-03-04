@@ -202,8 +202,14 @@ clone_keys(char *prefix, char *new_prefix)
                         freeReplyObject(cp);
                     }
                     freeReplyObject(cur);
-
                 }
+                else if ( strcmp( r->str, "set" ) == )
+                  {
+                  }
+                else
+                  {
+                    fprintf(stderr, "The key type '%s' is not one we expect to find.\nAborting\n", r->str );
+                  }
 
             }
             freeReplyObject(r);
