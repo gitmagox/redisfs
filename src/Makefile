@@ -9,14 +9,14 @@ LDFLAGS=`pkg-config fuse --libs`
 #
 #  By default make our filesystem.
 #
-all: link redisfs
+all: link redisfs redisfs-snapshot
 
 
 #
 #  Clean.
 #
 clean:
-	rm redisfs *.o || true
+	rm redisfs redisfs-snapshot *.o || true
 	rm -f fmacros.h || true
 	rm -f hiredis.c || true
 	rm -f hiredis.h || true
@@ -38,6 +38,7 @@ install:
 #
 tidy:
 	indent --no-space-after-function-call-names --no-space-after-casts --braces-after-if-line --no-tabs --indent-level 4 -bli0 -cdb -sc redisfs.c
+	indent --no-space-after-function-call-names --no-space-after-casts --braces-after-if-line --no-tabs --indent-level 4 -bli0 -cdb -sc redisfs-snapshot.c
 
 
 #
@@ -45,6 +46,16 @@ tidy:
 #
 redisfs: pathutil.o redisfs.o hiredis.o sds.o net.o
 
+
+#
+#  The filesystem snapshot utility
+#
+redisfs-snapshot: pathutil.o redisfs-snapshot.o hiredis.o sds.o net.o
+
+
+#
+#  Link our C-client library into place
+#
 link:
 	ln -sf ../hiredis/fmacros.h .
 	ln -sf ../hiredis/hiredis.c .
