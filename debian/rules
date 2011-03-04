@@ -33,7 +33,8 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 
-	cp ./src/redisfs $(CURDIR)/debian/redisfs/sbin/
+	cp ./src/redisfs          $(CURDIR)/debian/redisfs/sbin/
+	cp ./src/redisfs-snapshot $(CURDIR)/debian/redisfs/sbin/
 
 
 binary-indep: build install
