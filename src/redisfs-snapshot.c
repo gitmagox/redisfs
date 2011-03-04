@@ -177,7 +177,34 @@ clone_keys(char *prefix, char *new_prefix)
             if (r != NULL)
             {
                 if (_g_debug)
-                    fprintf(stderr, "\tkey is a: %s\n", r->str);
+                    fprintf(stderr, "\tkey has type '%s'\n", r->str);
+
+                /**
+                 * If type is a string ..
+                 */
+                if (strcmp(r->str, "string") == 0)
+                {
+                    redisReply *cur = NULL;
+                    redisReply *cp = NULL;
+
+                    /**
+                     * get the value of the key.
+                     */
+                    cur = redisCommand(_g_redis, "GET %s", old_key);
+
+                    if ( (cur != NULL) && ( cur->type == REDIS_REPLY_STRING ) )
+                    {
+                      /**
+                       * Set the value in the copied key.
+                       */
+                        cp = redisCommand(_g_redis, "SET %s %b", new_key,
+                                          cur->str, cur->len);
+                        freeReplyObject(cp);
+                    }
+                    freeReplyObject(cur);
+
+                }
+
             }
             freeReplyObject(r);
 
