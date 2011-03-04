@@ -1147,8 +1147,8 @@ fs_open(const char *path, struct fuse_file_info *fi)
      * If we're running with --fast just return, and don't
      * update the atime.
      */
-    if ( _g_fast )
-      return 0;
+    if (_g_fast)
+        return 0;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -1469,8 +1469,8 @@ fs_access(const char *path, int mode)
      * If we're running with --fast just return, and don't
      * update the atime.
      */
-    if ( _g_fast )
-      return 0;
+    if (_g_fast)
+        return 0;
 
 
     pthread_mutex_lock(&_g_lock);
