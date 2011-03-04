@@ -203,7 +203,7 @@ clone_keys(char *prefix, char *new_prefix)
                     }
                     freeReplyObject(cur);
                 }
-                else if ( strcmp( r->str, "set" ) == )
+                else if ( strcmp( r->str, "set" ) == 0 )
                   {
                   }
                 else
