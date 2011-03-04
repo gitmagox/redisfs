@@ -185,7 +185,6 @@ clone_keys(char *prefix, char *new_prefix)
                 if (strcmp(r->str, "string") == 0)
                 {
                     redisReply *cur = NULL;
-                    redisReply *cp = NULL;
 
                     /**
                      * get the value of the key.
@@ -197,6 +196,8 @@ clone_keys(char *prefix, char *new_prefix)
                       /**
                        * Set the value in the copied key.
                        */
+                        redisReply *cp = NULL;
+
                         cp = redisCommand(_g_redis, "SET %s %b", new_key,
                                           cur->str, cur->len);
                         freeReplyObject(cp);
@@ -205,6 +206,39 @@ clone_keys(char *prefix, char *new_prefix)
                 }
                 else if (strcmp(r->str, "set") == 0)
                 {
+                  /**
+                   * The type is a set - we need to find and clone
+                   * each of the members.
+                   *
+                   * Thankfully the members of a set will be things
+                   * like "1", "2", "3" - we don't need to transform
+                   * those member names.
+                   *
+                   * Sometimes I'm lucky by accident, and sometimes by
+                   * design.  I will not comment either way ;)
+                   *
+                   */
+                    redisReply *cur = NULL;
+                    cur = redisCommand(_g_redis, "SMEMBERS %s", old_key);
+                    if (cur != NULL)
+                    {
+                        int i;
+
+                        if (_g_debug)
+                            fprintf(stderr, "\tcloning %d set members\n",
+                                    (int)cur->elements);
+
+                        for (i = 0; i < cur->elements; i++)
+                        {
+                            redisReply *r = NULL;
+                            r = redisCommand(_g_redis, "SADD %s %b",
+                                             new_key,
+                                             cur->element[i]->str,
+                                             cur->element[i]->len);
+                            freeReplyObject(r);
+                        }
+                    }
+                    freeReplyObject(cur);
                 }
                 else
                 {
