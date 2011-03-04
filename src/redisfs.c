@@ -1946,8 +1946,9 @@ main(int argc, char *argv[])
     /**
      * Show our options.
      */
-    printf("Connecting to redis server %s:%d and mounting at %s.\n",
+    printf("Connecting to redis-server %s:%d and mounting at %s.\n",
            _g_redis_host, _g_redis_port, _g_mount);
+    printf("The prefix for all key-names is '%s'\n", _g_prefix);
 
     /**
      * If we're read-only say so.
