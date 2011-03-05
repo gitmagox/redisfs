@@ -1,5 +1,9 @@
   *  We could probably cache more.
 
+  *  We could certainly compress the file contents - pro being that
+    network round-trip time will be reduced.
+        http://www.fastlz.org/
+
   *  Performance could be improved by either batching up operations, or
     going ASYNC.  (Caveat: We use a global mutex because FUSE doesn't play
     so well with ASYNC stuffs.  Investigate.)
