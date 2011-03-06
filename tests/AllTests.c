@@ -16,11 +16,13 @@
 
 
 #include "CuTest.h"
+#include "fastlz_test.h"
 #include "pathutil_test.h"
 
 
-/* defined in dhshellusers_test.c */
+/* defined in pathutil_test.c */
 CuSuite *pathutil_getsuite ();
+CuSuite *fastlz_getsuite ();
 
 
 /**
@@ -36,6 +38,7 @@ RunAllTests (void)
     CuSuite *suite = CuSuiteNew ();
 
     CuSuiteAddSuite (suite, pathutil_getsuite ());
+    CuSuiteAddSuite (suite, fastlz_getsuite ());
 
     CuSuiteRun (suite);
     CuSuiteSummary (suite, output);
