@@ -23,7 +23,7 @@ clean:
 #
 #  Symlink
 #
-link: 
+link:
 	ln -sf ../src/pathutil.c .
 	ln -sf ../src/pathutil.h .
 
@@ -39,4 +39,4 @@ tidy:
 #  Test code
 #
 tests: pathutil.o AllTests.o CuTest.o pathutil_test.o zlib_test.o
-	gcc -o tests pathutil.o AllTests.o CuTest.o  pathutil_test.o zlib_test.o -lz 
+	gcc -o tests pathutil.o AllTests.o CuTest.o  pathutil_test.o zlib_test.o -lz
