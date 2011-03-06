@@ -89,6 +89,7 @@ To build the code, assuming you have the required build dependencies
 installed, you should merely need to run:
 
      make
+     make test
 
 Once built the software can be installed via:
 
