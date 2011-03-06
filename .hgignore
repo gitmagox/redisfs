@@ -35,6 +35,14 @@ syntax: glob
 ./tests/tests
 
 #
+#  Ignore our symlinks
+#
+./tests/fastlz.c
+./tests/fastlz.h
+./tests/pathutil.c
+./tests/pathutil.h
+
+#
 # on the off-chance somebody builds them.
 #
 ./hiredis/hiredis-example
