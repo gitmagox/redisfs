@@ -31,4 +31,4 @@ link:
 #  Test code
 #
 tests: pathutil.o AllTests.o CuTest.o pathutil_test.o zlib_test.o
-	gcc -o tests pathutil.o AllTests.o CuTest.o  pathutil_test.o zlib_test.o 
+	gcc -o tests pathutil.o AllTests.o CuTest.o  pathutil_test.o zlib_test.o -lz 
