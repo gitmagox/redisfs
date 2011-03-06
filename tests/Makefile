@@ -28,6 +28,14 @@ link:
 	ln -sf ../src/pathutil.h .
 
 #
+#  Indent & tidy.
+#
+tidy:
+	indent --no-space-after-function-call-names --no-space-after-casts --braces-after-if-line --no-tabs --indent-level 4 -bli0 -cdb -sc pathutil_test.c
+	indent --no-space-after-function-call-names --no-space-after-casts --braces-after-if-line --no-tabs --indent-level 4 -bli0 -cdb -sc zlib_test.c
+
+
+#
 #  Test code
 #
 tests: pathutil.o AllTests.o CuTest.o pathutil_test.o zlib_test.o
