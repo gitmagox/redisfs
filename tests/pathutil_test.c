@@ -97,7 +97,6 @@ TestEmptyBasename(CuTest * tc)
 
     output = get_basename(input);
     CuAssertStrEquals(tc, output, expected);
-
     free(output);
 }
 
@@ -162,6 +161,21 @@ TestSimpleParent(CuTest * tc)
 }
 
 
+/**
+ * Test that a parent of / is still /.
+ */
+void
+TestRootParent(CuTest * tc)
+{
+    char *expected = "/";
+    char *input = "/";
+    char *output = NULL;
+
+    output = get_parent(input);
+    CuAssertStrEquals(tc, output, expected);
+
+    free(output);
+}
 
 
 CuSuite *
@@ -176,6 +190,7 @@ pathutil_getsuite()
     SUITE_ADD_TEST(suite, TestEmptyParent);
     SUITE_ADD_TEST(suite, TestSimpleBasename);
     SUITE_ADD_TEST(suite, TestSimpleParent);
+    SUITE_ADD_TEST(suite, TestRootParent);
 
     return suite;
 }
