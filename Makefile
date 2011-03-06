@@ -35,7 +35,7 @@ install: all
 refresh:
 	rm -rf ./hiredis/
 	git clone https://github.com/antirez/hiredis.git
-
+	rm -rf ./hiredis/.git*
 
 #
 #  Make a new release tarball, and make a GPG signature.
