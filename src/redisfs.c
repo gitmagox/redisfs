@@ -45,7 +45,7 @@
  *  For example a top level directory containing "/etc" (uid=6) and
  * "/bin" (uid=7)" will look like this:
  *
- *   SKX:/ -> [ 6, 7 ]
+ *   SKX:DIR:/ -> [ 6, 7 ]
  *
  * </overview>
  *
@@ -334,7 +334,7 @@ find_inode(const char *path)
   /**
    * For each entry in the set we need to add the name.
    */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, parent);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, parent);
 
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
@@ -450,7 +450,7 @@ fs_readdir(const char *path,
     /**
      * For each entry in the set ..
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
 
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
@@ -665,7 +665,7 @@ fs_mkdir(const char *path, mode_t mode)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, key);
+    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -740,7 +740,7 @@ fs_rmdir(const char *path)
     /**
      * Make sure the directory isn't empty.
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
         if (reply->elements > 0)
@@ -770,7 +770,7 @@ fs_rmdir(const char *path)
      * [2/4] Remove from the set.
      */
     parent = get_parent(path);
-    reply = redisCommand(_g_redis, "SREM %s:%s %d", _g_prefix, parent, inode);
+    reply = redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1028,7 +1028,7 @@ fs_symlink(const char *target, const char *path)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, key);
+    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -1216,7 +1216,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, key);
+    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -1539,7 +1539,7 @@ fs_unlink(const char *path)
      * [2/4] Remove from the set.
      */
     parent = get_parent(path);
-    reply = redisCommand(_g_redis, "SREM %s:%s %d", _g_prefix, parent, inode);
+    reply = redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1615,7 +1615,7 @@ fs_rename(const char *old, const char *path)
      */
     char *parent = get_parent(old);
     reply =
-        redisCommand(_g_redis, "SREM %s:%s %d", _g_prefix, parent, old_inode);
+        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, old_inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1624,7 +1624,7 @@ fs_rename(const char *old, const char *path)
      */
     parent = get_parent(path);
     reply =
-        redisCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, old_inode);
+        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, old_inode);
     freeReplyObject(reply);
     free(parent);
 
