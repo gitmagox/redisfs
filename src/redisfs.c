@@ -856,6 +856,11 @@ fs_write(const char *path,
 
         if (ret != Z_OK)
         {
+          if ( ret == Z_BUF_ERROR)
+            {
+              fprintf(stderr, "Compressed size (%d) is larger than input size (%d) - something needs to be done!\n", (int)compressed_len, (int)size );
+            }
+
             fprintf(stderr,
                     "compress2(%d)->%d failed - aborting write - return was is %d\n",
                     (int)size, (int)compressed_len, ret);
@@ -918,7 +923,7 @@ fs_write(const char *path,
             redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
 
         /**
-         * TODO:  Uncompress here.
+         * Uncompress here.
          */
         uLongf decompressed_len = 0;
         void *decompressed;
@@ -928,10 +933,11 @@ fs_write(const char *path,
         int ret =
             uncompress(decompressed, &decompressed_len, (void *)reply->str,
                        reply->len);
+
         if (ret != Z_OK)
         {
             fprintf(stderr,
-                    "compress2() failed - aborting offset-write - return code was :%d\n",
+                    "uncompress() failed - aborting offset-write - return code was :%d\n",
                     ret);
             free(decompressed);
             pthread_mutex_unlock(&_g_lock);
@@ -983,6 +989,11 @@ fs_write(const char *path,
 
         if (ret != Z_OK)
         {
+          if ( ret == Z_BUF_ERROR)
+            {
+              fprintf(stderr, "Compressed size (%d) is larger than input size (%d) - something needs to be done!\n", (int)compressed_len, (int)new_sz );
+            }
+
             fprintf(stderr,
                     "compress2() failed - aborting write - return code was : %d\n",
                     ret);
@@ -1107,7 +1118,9 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 
     if (ret != Z_OK)
     {
-        fprintf(stderr, "DECOMPRESS FAILED - return code was : %d\n", ret);
+        fprintf(stderr,
+                "uncompress(%d bytes) failed - return code was : %d\n",
+                (int)sz, ret);
         free(decompressed);
         pthread_mutex_unlock(&_g_lock);
         return (-ENOENT);
