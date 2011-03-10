@@ -70,7 +70,7 @@
 #include <netinet/in.h>
 #include <getopt.h>
 #include <stdarg.h>
-
+#include <zlib.h>
 
 #include "hiredis.h"
 #include "pathutil.h"
@@ -665,7 +665,8 @@ fs_mkdir(const char *path, mode_t mode)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    reply =
+        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -770,7 +771,8 @@ fs_rmdir(const char *path)
      * [2/4] Remove from the set.
      */
     parent = get_parent(path);
-    reply = redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
+    reply =
+        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -824,8 +826,45 @@ fs_write(const char *path,
      */
     if (offset == 0)
     {
-        char *mem = malloc(size + 1);
-        memcpy(mem, buf, size);
+      /**
+       * We have data which we will write to the file:
+       *
+       *  The data is at location:  buf.
+       *  The data has size : size.
+       *
+       * We want to compress that data, and save the compressed
+       * version into redis.  Now the compression might result in
+       * contents which are *larger* than the original data, unlikely
+       * as that is, so we'll set the compression buffer to be
+       * larger than the input data by a factor of two.
+       *
+       */
+        char *compressed = malloc((size * 2) + 1);
+        uLongf compressed_len = ((size * 2) + 1);
+
+        if (compressed == NULL)
+        {
+            fprintf(stderr, "Memory allocation for compress2 failed\n");
+            pthread_mutex_unlock(&_g_lock);
+            return -ENOENT;
+        }
+
+
+        int ret =
+            compress2((void *)compressed, &compressed_len, (void *)buf, size,
+                      Z_BEST_SPEED);
+
+        if (ret != Z_OK)
+        {
+            fprintf(stderr, "compress2() failed - aborting write\n");
+            free(compressed);
+            pthread_mutex_unlock(&_g_lock);
+            return -ENOENT;
+
+        }
+
+        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
+                (int)compressed_len);
 
       /**
        *  set the size & mtime.
@@ -849,9 +888,9 @@ fs_write(const char *path,
        * Set the new data
        */
         reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, mem, size);
+                             _g_prefix, inode, compressed, compressed_len);
         freeReplyObject(reply);
-        free(mem);
+        free(compressed);
     }
     else
     {
@@ -939,6 +978,10 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     redisReply *reply = NULL;
     size_t sz;
 
+    uLongf decompressed_len = 0;
+    void *decompressed;
+
+
     pthread_mutex_lock(&_g_lock);
 
     if (_g_debug)
@@ -963,26 +1006,62 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     /**
      * Get the current file size.
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE",
-                         _g_prefix, inode, size);
+    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE", _g_prefix, inode);
     sz = atoi(reply->str);
     freeReplyObject(reply);
+
+    /**
+     * Get the decompressed length.
+     */
+    decompressed_len = sz;
+
+    /**
+     * Allocate the memory to hold the decompressed copy of the data.
+     */
+    decompressed = malloc(decompressed_len);
+
+    if (decompressed == NULL)
+    {
+        fprintf(stderr, "Memory allocation for decompression failed.\n");
+        free(decompressed);
+        pthread_mutex_unlock(&_g_lock);
+        return (-ENOENT);
+    }
+
 
     /**
      * Get the file contents.
      */
     reply = redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
 
+
+    int ret = uncompress(decompressed, &decompressed_len, (void *)reply->str,
+                         sz);
+
+    if (ret != Z_OK)
+    {
+        fprintf(stderr, "DECOMPRESS FAILED\n");
+        free(decompressed);
+        pthread_mutex_unlock(&_g_lock);
+        return (-ENOENT);
+
+    }
+
     /**
      * Copy the data into the callee's buffer.
      */
-    if (sz < size)
-        size = sz;
+    if (((int)decompressed_len) < size)
+        size = (int)decompressed_len;
 
     if (size > 0)
-        memcpy(buf, reply->str + offset, size);
+        memcpy(buf, decompressed + offset, size);
 
     freeReplyObject(reply);
+
+    /**
+     * Free the decompression buffer.
+     */
+    free(decompressed);
 
     pthread_mutex_unlock(&_g_lock);
     return size;
@@ -1031,7 +1110,8 @@ fs_symlink(const char *target, const char *path)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    reply =
+        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -1219,7 +1299,8 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     /**
      * Add the entry to the parent directory.
      */
-    reply = redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    reply =
+        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
     freeReplyObject(reply);
 
     /**
@@ -1542,7 +1623,8 @@ fs_unlink(const char *path)
      * [2/4] Remove from the set.
      */
     parent = get_parent(path);
-    reply = redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
+    reply =
+        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1618,7 +1700,8 @@ fs_rename(const char *old, const char *path)
      */
     char *parent = get_parent(old);
     reply =
-        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, old_inode);
+        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent,
+                     old_inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1627,7 +1710,8 @@ fs_rename(const char *old, const char *path)
      */
     parent = get_parent(path);
     reply =
-        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, old_inode);
+        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent,
+                     old_inode);
     freeReplyObject(reply);
     free(parent);
 
