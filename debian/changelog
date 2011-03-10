@@ -1,6 +1,6 @@
 redisfs (0.6-1) unstable; urgency=low
 
-  * New release - includes the snapshot tool "redisfs-snapshot".
+  * New release - Using zlib compression of file contents.
 
  -- Steve Kemp <steve@steve.org.uk>  Thu, 10 Mar 2011 22:11:00 +0000
 
