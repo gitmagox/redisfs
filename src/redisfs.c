@@ -913,6 +913,26 @@ fs_write(const char *path,
             redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
 
         /**
+         * TODO:  Uncompress here.
+         */
+        uLongf decompressed_len = 0;
+        void *decompressed;
+        decompressed_len = sz;
+        decompressed = malloc(sz);
+
+        int ret =
+            uncompress(decompressed, &decompressed_len, (void *)reply->str,
+                       reply->len);
+        if (ret != Z_OK)
+        {
+            fprintf(stderr, "compress2() failed - aborting offset-write\n");
+            free(decompressed);
+            pthread_mutex_unlock(&_g_lock);
+            return -ENOENT;
+        }
+
+
+        /**
          * OK so reply->str is a pointer to the current
          * file contents.
          *
@@ -929,22 +949,46 @@ fs_write(const char *path,
         /**
          * Copy current contents.
          */
-        memcpy(nw, reply->str, sz);
+        memcpy(nw, decompressed, sz);
+        free(decompressed);
 
         /**
          * Copy the new written data.
          */
         memcpy(nw + offset, buf, size);
+        freeReplyObject(reply);
+
+        /**
+         * Compress here: See previous note about size doubling.
+         */
+        uLongf compressed_len = ((new_sz * 2) + 1);
+        char *compressed = malloc(new_sz * 2 + 1);
+
+        ret =
+            compress2((void *)compressed, &compressed_len, (void *)nw, new_sz,
+                      Z_BEST_SPEED);
+
+        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)new_sz,
+                (int)compressed_len);
+
+        if (ret != Z_OK)
+        {
+            fprintf(stderr, "compress2() failed - aborting write\n");
+            free(compressed);
+            pthread_mutex_unlock(&_g_lock);
+            return -ENOENT;
+
+        }
 
         /**
          * Now store contents.
          */
-        freeReplyObject(reply);
 
         reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, nw, new_sz);
+                             _g_prefix, inode, compressed,
+                             (int)compressed_len);
         freeReplyObject(reply);
-
+        free(compressed);
         /**
          * Finally update the size & mtime.
          */
