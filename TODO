@@ -1,8 +1,7 @@
   *  We could probably cache more.
+     CAVEAT: That might make slaves out of sync.
 
-  *  We can compress the file contents, which are stored beneath
-    keys of the form $prefix:INODE:x:DATA.  See the testsuite for
-    sample code.
+  *  Compress all file writes, not just those in first buffer.
 
   *  Performance could be improved by either batching up operations, or
     going ASYNC.  (Caveat: We use a global mutex because FUSE doesn't play
