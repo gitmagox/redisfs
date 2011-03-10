@@ -856,15 +856,20 @@ fs_write(const char *path,
 
         if (ret != Z_OK)
         {
-            fprintf(stderr, "compress2() failed - aborting write\n");
+            fprintf(stderr,
+                    "compress2(%d)->%d failed - aborting write - return was is %d\n",
+                    (int)size, (int)compressed_len, ret);
             free(compressed);
             pthread_mutex_unlock(&_g_lock);
             return -ENOENT;
 
         }
 
-        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
-                (int)compressed_len);
+        if (_g_debug)
+        {
+            fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
+                    (int)compressed_len);
+        }
 
       /**
        *  set the size & mtime.
@@ -925,7 +930,9 @@ fs_write(const char *path,
                        reply->len);
         if (ret != Z_OK)
         {
-            fprintf(stderr, "compress2() failed - aborting offset-write\n");
+            fprintf(stderr,
+                    "compress2() failed - aborting offset-write - return code was :%d\n",
+                    ret);
             free(decompressed);
             pthread_mutex_unlock(&_g_lock);
             return -ENOENT;
@@ -968,12 +975,17 @@ fs_write(const char *path,
             compress2((void *)compressed, &compressed_len, (void *)nw, new_sz,
                       Z_BEST_SPEED);
 
-        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)new_sz,
-                (int)compressed_len);
+        if (_g_debug)
+        {
+            fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)new_sz,
+                    (int)compressed_len);
+        }
 
         if (ret != Z_OK)
         {
-            fprintf(stderr, "compress2() failed - aborting write\n");
+            fprintf(stderr,
+                    "compress2() failed - aborting write - return code was : %d\n",
+                    ret);
             free(compressed);
             pthread_mutex_unlock(&_g_lock);
             return -ENOENT;
@@ -1055,6 +1067,17 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     freeReplyObject(reply);
 
     /**
+     * Special case - is the file empty?
+     */
+    if (sz == 0)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
+
+
+
+    /**
      * Get the decompressed length.
      */
     decompressed_len = sz;
@@ -1084,7 +1107,7 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 
     if (ret != Z_OK)
     {
-        fprintf(stderr, "DECOMPRESS FAILED\n");
+        fprintf(stderr, "DECOMPRESS FAILED - return code was : %d\n", ret);
         free(decompressed);
         pthread_mutex_unlock(&_g_lock);
         return (-ENOENT);
