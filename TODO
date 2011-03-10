@@ -1,6 +1,9 @@
   *  We could probably cache more.
      CAVEAT: That might make slaves out of sync.
 
+  * Make compression optional - added command line flag, need to make
+   it work.
+
   *  Performance could be improved by either batching up operations, or
     going ASYNC.  (Caveat: We use a global mutex because FUSE doesn't play
     so well with ASYNC stuffs.  Investigate.)

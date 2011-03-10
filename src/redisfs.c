@@ -124,6 +124,11 @@ int _g_fast = 0;
 
 
 /**
+ * Should we compress data?
+ */
+int _g_compress = 1;
+
+/**
  * Is our file-system (intentionally) read-only?
  */
 int _g_read_only = 0;
@@ -2024,6 +2029,7 @@ main(int argc, char *argv[])
             {"help", no_argument, 0, 'h'},
             {"host", required_argument, 0, 's'},
             {"mount", required_argument, 0, 'm'},
+            {"no-compress", no_argument, 0, 'n'},
             {"port", required_argument, 0, 'P'},
             {"prefix", required_argument, 0, 'p'},
             {"read-only", no_argument, 0, 'r'},
@@ -2032,7 +2038,7 @@ main(int argc, char *argv[])
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:drhvf", long_options,
+        c = getopt_long(argc, argv, "s:P:m:p:drhvfn", long_options,
                         &option_index);
 
         /*
@@ -2056,6 +2062,9 @@ main(int argc, char *argv[])
             break;
         case 'f':
             _g_fast = 1;
+            break;
+        case 'n':
+            _g_compress = 0;
             break;
         case 'r':
             _g_read_only = 1;
@@ -2123,6 +2132,13 @@ main(int argc, char *argv[])
     if (_g_read_only)
         printf("Filesystem is read-only.\n");
 
+    /**
+     * Declare the state of compression.
+     */
+    if (_g_compress )
+      printf( "Compressing file contents in memory.\n");
+    else
+      printf( "Not using ZLIB compression for file contents.\n");
 
     /**
      * Launch fuse.
