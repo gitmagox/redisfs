@@ -841,37 +841,44 @@ fs_write(const char *path,
      */
     if (offset == 0)
     {
-      /**
-       * Delete the current data.
-       */
-        reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
-                             _g_prefix, inode);
-        freeReplyObject(reply);
+        char *mem = malloc(size + 1);
+        memcpy(mem, buf, size);
+
+	if (_g_debug)
+          fprintf(stderr, "fs_write->simple(%s);\n", path);
 
       /**
-       * Set the new data
+       * Batch setx2, delete, set new data
        */
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, buf, size);
-        freeReplyObject(reply);
+        redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
+					_g_prefix, inode, size);
+	redisAppendCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+					_g_prefix, inode, time(NULL));
+	redisAppendCommand(_g_redis, "DEL %s:INODE:%d:DATA",
+					_g_prefix, inode);
 
-      /**
-       *  set the size & mtime.
-       */
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                             _g_prefix, inode, size);
-        freeReplyObject(reply);
+	redisAppendCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
+			     _g_prefix, inode, mem, size);
 
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                             _g_prefix, inode, time(NULL));
-        freeReplyObject(reply);
+	redisGetReply(_g_redis,(void**)&reply);
+    	freeReplyObject(reply);
+	redisGetReply(_g_redis,(void**)&reply);
+    	freeReplyObject(reply);
+	redisGetReply(_g_redis,(void**)&reply);
+    	freeReplyObject(reply);
+	redisGetReply(_g_redis,(void**)&reply);
+    	freeReplyObject(reply);
+
+        free(mem);
 
     }
     else
     {
+	if (_g_debug)
+          fprintf(stderr, "fs_write->offsetted(%s);\n", path);
         int sz;
         int new_sz;
-        char *nw;
+        //char *nw;
 
         /**
          * Get the current file size.
@@ -881,60 +888,41 @@ fs_write(const char *path,
         sz = atoi(reply->str);
         freeReplyObject(reply);
 
-        /**
-         * Get the current file contents.
-         */
-        reply =
-            redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
-
-        /**
-         * OK so reply->str is a pointer to the current
-         * file contents.
-         *
-         * We need to resize this.
-         */
         new_sz = offset + size;
 
         /**
-         * Create new memory.
+         * Copy the new data.
          */
-        nw = (char *)malloc(new_sz);
-        memset(nw, '\0', new_sz);
-
-        /**
-         * Copy current contents.
-         */
-        memcpy(nw, reply->str, sz);
-
-        /**
-         * Copy the new written data.
-         */
-        memcpy(nw + offset, buf, size);
-        freeReplyObject(reply);
+ 	char *mem = malloc(size);
+        memcpy(mem, buf, size);
 
         /**
          * Now store contents.
          */
-
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, nw, new_sz);
-        freeReplyObject(reply);
-
-        /**
-         * Finally update the size & mtime.
-         */
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
+	redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
                              _g_prefix, inode, new_sz);
+
+	redisAppendCommand(_g_redis, "APPEND %s:INODE:%d:DATA %b",
+				_g_prefix, inode, mem, size);
+
+	//don't store mtime if fast used
+        if(!_g_fast)
+	{
+         redisAppendCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                              _g_prefix, inode, time(NULL));
+	 redisGetReply(_g_redis,(void**)&reply);
+         freeReplyObject(reply);
+        }
+	redisGetReply(_g_redis,(void**)&reply);
+        freeReplyObject(reply);
+	redisGetReply(_g_redis,(void**)&reply);
         freeReplyObject(reply);
 
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                             _g_prefix, inode, time(NULL));
-        freeReplyObject(reply);
 
         /**
          * Free the memory.
          */
-        free(nw);
+	free(mem);
 
     }
 
@@ -977,34 +965,34 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     /**
      * Get the current file size.
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE", _g_prefix, inode);
+    reply = redisCommand(_g_redis, "GET %s:INODE:%d:SIZE",
+                         _g_prefix, inode, size);
     sz = atoi(reply->str);
     freeReplyObject(reply);
 
-    /**
-     * Special case - is the file empty?
-     */
-    if (sz == 0)
-    {
-        pthread_mutex_unlock(&_g_lock);
-        return 0;
-    }
+    if (sz < size)
+        size = sz;
+    if (offset+size > sz)
+	size = sz - offset;
 
     /**
      * Get the file contents.
+     * this is a pretty bad bottleneck here - it grabs the entire contents and then memcpy's the bit it likes
+     *
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
+    reply = redisCommand(_g_redis, "GETRANGE %s:INODE:%d:DATA %lu %lu", _g_prefix, inode, offset, size+offset );
 
-    if (reply->len < size)
-        size = reply->len;
-
-    if (size > 0)
-        memcpy(buf, reply->str + offset, size);
+    /**
+     * Copy the data into the callee's buffer.
+     */
+    if (size >0)
+        memcpy(buf, reply->str , size);
 
     freeReplyObject(reply);
 
     pthread_mutex_unlock(&_g_lock);
     return size;
+
 }
 
 
