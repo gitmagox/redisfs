@@ -283,12 +283,12 @@ remove_inode(int inode)
     while (names[i] != NULL)
     {
         redisAppendCommand(_g_redis, names[i], _g_prefix, inode);
-	i+=1;
+        i += 1;
     }
     i = 0;
     while (names[i] != NULL)
     {
-	redisGetReply(_g_redis,(void**)&reply);
+        redisGetReply(_g_redis, (void **)&reply);
         freeReplyObject(reply);
         i += 1;
     }
@@ -543,31 +543,38 @@ fs_getattr(const char *path, struct stat *stbuf)
         return -ENOENT;
     }
 
-
     /**
      * Setup atime, mtime, ctime, and owner/gid.
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:CTIME", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:CTIME", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:ATIME", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:MTIME", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:GID", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:UID", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:LINK", _g_prefix, inode);
+    redisAppendCommand(_g_redis, "GET %s:INODE:%d:TYPE", _g_prefix, inode);
+
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_ctime = atoi(reply->str);
     freeReplyObject(reply);
 
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:ATIME", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_atime = atoi(reply->str);
     freeReplyObject(reply);
 
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:MTIME", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_mtime = atoi(reply->str);
     freeReplyObject(reply);
 
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:GID", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_gid = atoi(reply->str);
     freeReplyObject(reply);
 
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:UID", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_uid = atoi(reply->str);
     freeReplyObject(reply);
@@ -575,15 +582,15 @@ fs_getattr(const char *path, struct stat *stbuf)
     /**
      * Link count.
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:LINK", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
         stbuf->st_nlink = atoi(reply->str);
     freeReplyObject(reply);
 
     /**
-     *  Type
+     *  Entry Type
      */
-    reply = redisCommand(_g_redis, "GET %s:INODE:%d:TYPE", _g_prefix, inode);
+    redisGetReply(_g_redis, (void **)&reply);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
     {
 
@@ -840,27 +847,27 @@ fs_write(const char *path,
       /**
        * Delete the current data.
        */
-      reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
-                           _g_prefix, inode);
-      freeReplyObject(reply);
+        reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
+                             _g_prefix, inode);
+        freeReplyObject(reply);
 
       /**
        * Set the new data
        */
-      reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                           _g_prefix, inode, buf, size);
-      freeReplyObject(reply);
+        reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
+                             _g_prefix, inode, buf, size);
+        freeReplyObject(reply);
 
       /**
        *  set the size & mtime.
        */
-      reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                           _g_prefix, inode, size);
-      freeReplyObject(reply);
+        reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
+                             _g_prefix, inode, size);
+        freeReplyObject(reply);
 
-      reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                           _g_prefix, inode, time(NULL));
-      freeReplyObject(reply);
+        reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                             _g_prefix, inode, time(NULL));
+        freeReplyObject(reply);
 
     }
     else
@@ -913,8 +920,7 @@ fs_write(const char *path,
          */
 
         reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, nw,
-                             new_sz);
+                             _g_prefix, inode, nw, new_sz);
         freeReplyObject(reply);
 
         /**
@@ -993,10 +999,10 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     reply = redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
 
     if (reply->len < size)
-      size = reply->len;
+        size = reply->len;
 
     if (size > 0)
-      memcpy(buf, reply->str + offset, size);
+        memcpy(buf, reply->str + offset, size);
 
     freeReplyObject(reply);
 
