@@ -3,7 +3,7 @@ Section: utils
 Priority: optional
 Maintainer: Steve Kemp <steve@steve.org.uk>
 Build-Depends: debhelper (>= 6), libfuse-dev, pkg-config
-Standards-Version: 3.8.4
+Standards-Version: 3.9.1
 Homepage: http://steve.org.uk/Software/redisfs/
 
 Package: redisfs
