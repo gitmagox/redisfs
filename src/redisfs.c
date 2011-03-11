@@ -1970,6 +1970,7 @@ main(int argc, char *argv[])
     if (_g_read_only)
         printf("Filesystem is read-only.\n");
 
+
     /**
      * Launch fuse.
      */
