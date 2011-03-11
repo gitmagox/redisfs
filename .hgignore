@@ -5,7 +5,6 @@ syntax: glob
 #
 ./.version
 
-
 #
 # The upstream repo for the redis C-client library
 #
@@ -22,6 +21,8 @@ syntax: glob
 ./src/sds.c
 ./src/sds.h
 ./src/util.h
+./src/anet.c
+./src/anet.h
 
 #
 #  Ignore all object files.
@@ -32,6 +33,7 @@ syntax: glob
 #  Ignore our binaries
 #
 ./src/redisfs
+./src/redisfs-snapshot
 ./tests/tests
 
 #
