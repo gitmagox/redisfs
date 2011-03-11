@@ -1,0 +1,208 @@
+#!/usr/bin/perl -w
+#
+#  Simple script to stress-test the filesystem.
+#
+# Steve
+# --
+#
+
+
+use strict;
+use warnings;
+
+local $| = 1;
+
+
+#
+#  Get the first command line argument.
+#
+my $arg = shift || "";
+
+#
+#  If we received an argument, and it was --force, then
+# we can run.
+#
+if ( !length($arg) || ( $arg ne "--force" ) )
+{
+
+    #
+    #  Otherwise prompt for confirmation
+    #
+    print "[Running './fstest --force' will skip this prompt]\n\n";
+    print
+      "This test will remove all keys from the redis-server, proceed [Y/N]?\n";
+
+    my $ok = 0;
+
+    while ( !$ok and ( my $line = <STDIN> ) )
+    {
+        chomp($line);
+        $ok = 1 if ( $line =~ /y/i );
+        exit if ( $line =~ /n/i );
+    }
+}
+
+
+#
+#  See if we're mounted
+#
+if ( !mounted() )
+{
+    print "redisfs doesn't seem to be mounted at /mnt/redis\n";
+    exit(1);
+}
+
+
+
+
+#
+#  Start test
+#
+system("redis-cli flushdb 2>/dev/null >/dev/null");
+
+
+#
+#  Count the keys in the filesystem
+#
+my $keys = countKeys();
+print "\nThere is $keys key present in redis.\n";
+
+
+#
+#  Create some random files.
+#
+print "\n";
+for ( my $i = 0 ; $i < 256 ; $i++ )
+{
+    print "\rCreating random file $i/256";
+    createRandomFile("/mnt/redis/$i");
+}
+print "\r\n";
+
+#
+#  Remove all files.
+#
+foreach my $file ( sort( glob("/mnt/redis/*") ) )
+{
+    print "\rRemoving file: $file";
+    unlink($file) if ( -e $file );
+}
+print "\r\n";
+
+#
+#  Keys should be one.
+#
+my $endKeys = countKeys();
+print "\nThere is now $keys key present in redis.\n";
+
+if ( $endKeys == 1 )
+{
+    print "OK: No leaks detected\n";
+}
+else
+{
+    print "FAIL: We've leaked a number of keys somewhere!\n";
+    exit;
+}
+
+#
+#  TODO:  More tests.
+#
+
+
+
+
+=begin doc
+
+Count the number of redis keys.
+
+=end doc
+
+=cut
+
+sub countKeys
+{
+    my $count = 0;
+    open( CMD, "redis-cli keys \*|" ) or
+      die "Failed to run redis-cli : $!";
+    while (<CMD>)
+    {
+        $count += 1;
+    }
+    close(CMD);
+
+    return $count;
+}
+
+
+=begin doc
+
+Given a file write a random number of bytes to that file.
+
+=end doc
+
+=cut
+
+sub createRandomFile
+{
+    my ($path) = (@_);
+
+    open( FILE, ">", $path ) or
+      die "Failed to open $path - $!";
+
+    #
+    #  Random size of the file to create.
+    #
+    my $size = int rand(32768);
+
+    #
+    #  Random characters to write to the file.
+    #
+    my $chars = join( '', map {( 'a' .. 'z' )[rand 26]} 0 .. $size );
+
+    #
+    #  Write to the file.
+    #
+    print FILE $chars;
+    close(FILE);
+
+    #
+    #  Verify the file has the expected size.
+    #
+    my ( $dev,   $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
+         $fsize, $atime, $mtime, $ctime, $blksize, $blocks
+       ) = stat($path);
+    $fsize -= 1;
+
+
+    if ( $size != $fsize )
+    {
+        print
+          "Attempted to write $size bytes to $path - but only $fsize were found\n";
+        exit 1;
+    }
+
+}
+
+
+=begin doc
+
+Is our filesystem mounted?
+
+=end doc
+
+=cut
+
+sub mounted
+{
+    open( FILE, "<", "/proc/mounts" ) or
+      die "Failed to open list of mounts - $!";
+    my $found = 0;
+    foreach my $line (<FILE>)
+    {
+        $found = 1 if ( $line =~ /\/mnt\/redis/ );
+    }
+    close(FILE);
+
+    return ($found);
+}
