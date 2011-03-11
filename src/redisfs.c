@@ -845,81 +845,83 @@ fs_write(const char *path,
        * of 16k.
        *
        */
-      if ( _g_compress )
-      {
-        int c_size = size;;
-        if (size <= 16384)
-          c_size = 1024 * 16;
-        else
-          c_size = (size * 2) + 1;
-
-        char *compressed = malloc(c_size);
-        uLongf compressed_len = c_size;
-
-        if (compressed == NULL)
-          {
-            fprintf(stderr, "Memory allocation for compress2 failed\n");
-            pthread_mutex_unlock(&_g_lock);
-            return -ENOENT;
-        }
-
-
-        int ret =
-            compress2((void *)compressed, &compressed_len, (void *)buf, size,
-                      Z_BEST_SPEED);
-
-        if (ret != Z_OK)
+        if (_g_compress)
         {
-            if (ret == Z_BUF_ERROR)
+            int c_size = size;;
+            if (size <= 16384)
+                c_size = 1024 * 16;
+            else
+                c_size = (size * 2) + 1;
+
+            char *compressed = malloc(c_size);
+            uLongf compressed_len = c_size;
+
+            if (compressed == NULL)
             {
-                fprintf(stderr,
-                        "Compressed size (%d) is larger than input size (%d) - something needs to be done!\n",
-                        (int)compressed_len, (int)size);
+                fprintf(stderr, "Memory allocation for compress2 failed\n");
+                pthread_mutex_unlock(&_g_lock);
+                return -ENOENT;
             }
 
-            fprintf(stderr,
-                    "compress2(%d)->%d failed - aborting write - return was is %d\n",
-                    (int)size, (int)compressed_len, ret);
-            free(compressed);
-            pthread_mutex_unlock(&_g_lock);
-            return -ENOENT;
 
-        }
+            int ret =
+                compress2((void *)compressed, &compressed_len, (void *)buf,
+                          size,
+                          Z_BEST_SPEED);
 
-        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
-                (int)compressed_len);
+            if (ret != Z_OK)
+            {
+                if (ret == Z_BUF_ERROR)
+                {
+                    fprintf(stderr,
+                            "Compressed size (%d) is larger than input size (%d) - something needs to be done!\n",
+                            (int)compressed_len, (int)size);
+                }
+
+                fprintf(stderr,
+                        "compress2(%d)->%d failed - aborting write - return was is %d\n",
+                        (int)size, (int)compressed_len, ret);
+                free(compressed);
+                pthread_mutex_unlock(&_g_lock);
+                return -ENOENT;
+
+            }
+
+            fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
+                    (int)compressed_len);
 
       /**
        * Delete the current data.
        */
-        reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
-                             _g_prefix, inode);
-        freeReplyObject(reply);
+            reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
+                                 _g_prefix, inode);
+            freeReplyObject(reply);
 
       /**
        * Set the new data
        */
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, compressed, compressed_len);
-        freeReplyObject(reply);
-        free(compressed);
-      }
-      else
-      {
+            reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
+                                 _g_prefix, inode, compressed,
+                                 compressed_len);
+            freeReplyObject(reply);
+            free(compressed);
+        }
+        else
+        {
         /**
          * Delete the current data.
          */
-        reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
-                             _g_prefix, inode);
-        freeReplyObject(reply);
+            reply = redisCommand(_g_redis, "DEL %s:INODE:%d:DATA",
+                                 _g_prefix, inode);
+            freeReplyObject(reply);
 
         /**
          * Set the new data
          */
-        reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                             _g_prefix, inode, buf, size);
-        freeReplyObject(reply);
-      }
+            reply = redisCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
+                                 _g_prefix, inode, buf, size);
+            freeReplyObject(reply);
+        }
 
 
       /**
@@ -1130,8 +1132,8 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     reply = redisCommand(_g_redis, "GET %s:INODE:%d:DATA", _g_prefix, inode);
 
 
-    if ( _g_compress )
-      {
+    if (_g_compress)
+    {
         /**
          * Get the decompressed length.
          */
@@ -1143,19 +1145,20 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
         decompressed = malloc(decompressed_len);
 
         if (decompressed == NULL)
-          {
+        {
             fprintf(stderr, "Memory allocation for decompression failed.\n");
             free(decompressed);
             pthread_mutex_unlock(&_g_lock);
             return (-ENOENT);
-          }
+        }
 
 
-        int ret = uncompress(decompressed, &decompressed_len, (void *)reply->str,
-                             reply->len);
+        int ret =
+            uncompress(decompressed, &decompressed_len, (void *)reply->str,
+                       reply->len);
 
         if (ret != Z_OK)
-          {
+        {
             fprintf(stderr,
                     "uncompress(%d bytes) failed - return code was : %d\n",
                     (int)sz, ret);
@@ -1163,25 +1166,25 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
             pthread_mutex_unlock(&_g_lock);
             return (-ENOENT);
 
-          }
+        }
 
         /**
          * Copy the data into the callee's buffer.
          */
         if (((int)decompressed_len) < size)
-          size = (int)decompressed_len;
+            size = (int)decompressed_len;
 
         if (size > 0)
-          memcpy(buf, decompressed + offset, size);
-      }
+            memcpy(buf, decompressed + offset, size);
+    }
     else
-      {
-        if ( reply->len < size)
-          size = reply->len;
+    {
+        if (reply->len < size)
+            size = reply->len;
 
         if (size > 0)
-          memcpy(buf, reply->str + offset, size);
-      }
+            memcpy(buf, reply->str + offset, size);
+    }
 
 
     freeReplyObject(reply);
@@ -1189,8 +1192,8 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
     /**
      * Free the decompression buffer.
      */
-    if ( decompressed )
-      free(decompressed);
+    if (decompressed)
+        free(decompressed);
 
     pthread_mutex_unlock(&_g_lock);
     return size;
