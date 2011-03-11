@@ -841,11 +841,18 @@ fs_write(const char *path,
        * version into redis.  Now the compression might result in
        * contents which are *larger* than the original data, unlikely
        * as that is, so we'll set the compression buffer to be
-       * larger than the input data by a factor of two.
+       * larger than the input data by a factor of two - with a minimum
+       * of 16k.
        *
        */
-        char *compressed = malloc((size * 2) + 1);
-        uLongf compressed_len = ((size * 2) + 1);
+      int c_size = size;;
+      if ( size <= 16384 )
+        c_size = 1024 * 16;
+      else
+        c_size = ( size * 2) + 1;
+
+      char *compressed = malloc(c_size );
+      uLongf compressed_len = c_size;
 
         if (compressed == NULL)
         {
@@ -875,11 +882,8 @@ fs_write(const char *path,
 
         }
 
-        if (_g_debug)
-        {
-            fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
-                    (int)compressed_len);
-        }
+        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)size,
+                (int)compressed_len);
 
       /**
        *  set the size & mtime.
@@ -979,18 +983,22 @@ fs_write(const char *path,
         /**
          * Compress here: See previous note about size doubling.
          */
-        uLongf compressed_len = ((new_sz * 2) + 1);
-        char *compressed = malloc(new_sz * 2 + 1);
+        int c_size = new_sz;
+        if ( new_sz <= 16384 )
+          c_size = 1024 * 16;
+        else
+          c_size = ( new_sz * 2) + 1;
+
+
+        uLongf compressed_len = (c_size);
+        char *compressed = malloc(c_size);
 
         ret =
             compress2((void *)compressed, &compressed_len, (void *)nw, new_sz,
                       Z_BEST_SPEED);
 
-        if (_g_debug)
-        {
-            fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)new_sz,
-                    (int)compressed_len);
-        }
+        fprintf(stderr, "COMPRESSED %d bytes to %d\n", (int)new_sz,
+                (int)compressed_len);
 
         if (ret != Z_OK)
         {
@@ -1119,7 +1127,7 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 
 
     int ret = uncompress(decompressed, &decompressed_len, (void *)reply->str,
-                         sz);
+                         reply->len);
 
     if (ret != Z_OK)
     {
