@@ -17,9 +17,11 @@ all:
 
 clean:
 	cd ./src     && make clean || true
+	cd ./src     && make clean || true
 	cd ./tests   && make clean || true
 	cd ./hiredis && make clean || true
 	find . -name '*~' -delete  || true
+	rm ./.version              || true
 
 test:
 	cd ./tests    && make link && make
