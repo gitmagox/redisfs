@@ -1879,7 +1879,7 @@ main(int argc, char *argv[])
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:drhvfzZ", long_options,
+        c = getopt_long(argc, argv, "s:P:m:p:drhvf", long_options,
                         &option_index);
 
         /*
