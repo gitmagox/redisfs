@@ -70,7 +70,6 @@
 #include <netinet/in.h>
 #include <getopt.h>
 #include <stdarg.h>
-#include <zlib.h>
 
 #include "hiredis.h"
 #include "pathutil.h"
@@ -96,6 +95,12 @@ char _g_prefix[10] = { "skx" };
  * Mutex for safety.
  */
 pthread_mutex_t _g_lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+/**
+ * Time of last redis check.
+ */
+int _g_lastcheck = 0;
 
 
 /**
@@ -277,7 +282,13 @@ remove_inode(int inode)
 
     while (names[i] != NULL)
     {
-        reply = redisCommand(_g_redis, names[i], _g_prefix, inode);
+        redisAppendCommand(_g_redis, names[i], _g_prefix, inode);
+	i+=1;
+    }
+    i = 0;
+    while (names[i] != NULL)
+    {
+	redisGetReply(_g_redis,(void**)&reply);
         freeReplyObject(reply);
         i += 1;
     }
