@@ -1894,7 +1894,7 @@ main(int argc, char *argv[])
         {
         case 'v':
             fprintf(stderr,
-                    "redisfs - version %.01f - <http://www.steve.org.uk/Software/redisfs>\n",
+                    "redisfs - version %s - <http://www.steve.org.uk/Software/redisfs>\n",
                     VERSION);
             exit(0);
         case 'p':

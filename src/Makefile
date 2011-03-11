@@ -5,6 +5,12 @@
 CFLAGS=-Wall -Werror -O3  `pkg-config fuse --cflags` -I. -DVERSION=$(VERSION)
 LDFLAGS=`pkg-config fuse --libs`
 
+#
+#  Version is only set if building from the top-level directory
+#
+ifndef VERSION
+VERSION=\"unknown\"
+endif
 
 #
 #  By default make our filesystem.

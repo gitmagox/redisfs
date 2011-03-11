@@ -12,7 +12,7 @@ BASE        = redisfs
 
 
 all:
-	cd ./src     && make link && make VERSION=$(VERSION)
+	cd ./src     && make link && make VERSION="\\\"$(VERSION)\\\""
 
 
 clean:
