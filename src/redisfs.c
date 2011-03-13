@@ -286,7 +286,12 @@ remove_inode(int inode)
     i = 0;
     while (names[i] != NULL)
     {
-        redisGetReply(_g_redis, (void **)&reply);
+      redisGetReply(_g_redis, (void **)&reply);
+      if ( ( reply != NULL ) && ( reply->type == REDIS_REPLY_ERROR ) )
+        {
+          fprintf(stderr, "ERROR DELETING: %s\n", reply->str);
+
+        }
         freeReplyObject(reply);
         i += 1;
     }
@@ -465,7 +470,7 @@ fs_readdir(const char *path,
     /**
      * For each entry in the set ..
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
 
     char *memcommand = malloc(1048576);
     sprintf(memcommand, "MGET");
@@ -741,7 +746,7 @@ fs_rmdir(const char *path)
     /**
      * Make sure the directory isn't empty.
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
         if (reply->elements > 0)
