@@ -31,6 +31,8 @@ clean:
 	rm -f net.c || true
 	rm -f net.h  || true
 	rm -f util.h  || true
+	rm -f anet.c  || true
+	rm -f anet.h  || true
 
 #
 #  Install the binary
