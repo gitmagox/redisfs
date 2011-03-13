@@ -1,0 +1,36 @@
+
+[1/1] Directory renaming is a little screwy
+-------------------------------------------
+
+  Directory is empty:
+
+skx@birthday:/mnt/redis$ redis-cli flushdb
+OK
+
+  Make a couple of directories:
+
+skx@birthday:/mnt/redis$ mkdir foo/bar/baz -p
+skx@birthday:/mnt/redis$ tree
+.
+└── foo
+    └── bar
+        └── baz
+3 directories, 0 files
+
+  Rename foo/bar -> foo/broke and we should expect to find
+ foo/broke/baz - but it isn't there.
+
+skx@birthday:/mnt/redis$ mv foo/bar/ foo/broke
+skx@birthday:/mnt/redis$ ls foo/broke/
+
+  Yet rename things back:
+
+skx@birthday:/mnt/redis$ mv foo/broke/ foo/bar
+skx@birthday:/mnt/redis$ ls foo/bar/
+baz
+
+
+  Issue is that we need to rename all "skx:DIR:/path/parts" entries.
+
+Steve
+--
