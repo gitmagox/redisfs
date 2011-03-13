@@ -273,23 +273,22 @@ remove_inode(int inode)
 
     redis_alive();
 
-    /*
-     * append up some commands and then clear them out
+    /**
+     * append the deletion commands, in a batch.
      */
     while (names[i] != NULL)
     {
         redisAppendCommand(_g_redis, names[i], _g_prefix, inode);
         i += 1;
     }
+
+    /**
+     * Fetch the results back.
+     */
     i = 0;
     while (names[i] != NULL)
     {
         redisGetReply(_g_redis, (void **)&reply);
-        if ((reply != NULL) && (reply->type == REDIS_REPLY_ERROR))
-        {
-            fprintf(stderr, "ERROR DELETING: %s\n", reply->str);
-
-        }
         freeReplyObject(reply);
         i += 1;
     }
