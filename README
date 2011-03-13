@@ -71,10 +71,10 @@ Similarly the entry for "/README" might look like this:
    INODE:2:UID  => "0"
    INODE:2:TYPE => "file"
 
-The actual contents of a directory are stored in a set, named after
-the directory:
+The actual contents of a directory are stored in a set, which has
+a name based upon the inode of the parent directory.  For example:
 
-   SMEMBERS DIR:/ -> { "1", "2" }
+   SMEMBERS DIRENT:3 -> { "5", "6" }
 
 
 In actual fact we add a prefix to each key and set name, which allows
