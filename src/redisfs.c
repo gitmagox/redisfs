@@ -1690,8 +1690,8 @@ writePID(const char *filename)
 int
 usage(int argc, char *argv[])
 {
-  printf("%s - version %s - Filesystem based upon FUSE\n", argv[0],
-         VERSION);
+    printf("%s - version %s - Filesystem based upon FUSE\n", argv[0],
+           VERSION);
     printf("\nOptions:\n\n");
     printf("\t--debug      - Launch with debugging information.\n");
     printf("\t--help       - Show this minimal help information.\n");
