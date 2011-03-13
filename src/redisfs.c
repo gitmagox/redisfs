@@ -1699,6 +1699,7 @@ usage(int argc, char *argv[])
         ("\t--mount      - The directory to mount our filesystem under [/mnt/redis].\n");
     printf("\t--port       - The port of the redis server [6389].\n");
     printf("\t--prefix     - A string prepended to any Redis key names.\n");
+    printf("\t--read-only  - Mount the filesystem read-only.\n");
     printf("\n");
 
     return 1;
