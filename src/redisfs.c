@@ -45,7 +45,7 @@
  *  For example a top level directory containing "/etc" (uid=6) and
  * "/bin" (uid=7)" will look like this:
  *
- *   SKX:DIR:/ -> [ 6, 7 ]
+ *   SKX:/ -> [ 6, 7 ]
  *
  * </overview>
  *
@@ -71,6 +71,7 @@
 #include <getopt.h>
 #include <stdarg.h>
 
+
 #include "hiredis.h"
 #include "pathutil.h"
 
@@ -95,12 +96,6 @@ char _g_prefix[10] = { "skx" };
  * Mutex for safety.
  */
 pthread_mutex_t _g_lock = PTHREAD_MUTEX_INITIALIZER;
-
-
-/**
- * Time of last redis check.
- */
-int _g_lastcheck = 0;
 
 
 /**
@@ -134,7 +129,7 @@ int _g_fast = 0;
 int _g_read_only = 0;
 
 
-
+int _g_lastcheck = 0;
 
 
 
@@ -280,6 +275,9 @@ remove_inode(int inode)
 
     redis_alive();
 
+    /*
+     * append up some commands and then clear them out
+     */
     while (names[i] != NULL)
     {
         redisAppendCommand(_g_redis, names[i], _g_prefix, inode);
@@ -321,7 +319,11 @@ find_inode(const char *path)
         val = atoi(reply->str);
         freeReplyObject(reply);
         if (val != -1)
+        {
+            if (_g_debug)
+                fprintf(stderr, "find_inode(%s)->hit\n", path);
             return val;
+        }
         else
         {
           /**
@@ -347,30 +349,32 @@ find_inode(const char *path)
    */
     reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, parent);
 
+    char *memcommand = malloc(1048576);
+    sprintf(memcommand, "MGET");
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
         int i;
-
         for (i = 0; i < reply->elements; i++)
         {
-            redisReply *r = NULL;
-
-            char *name = reply->element[i]->str;
-
-            r = redisCommand(_g_redis, "GET %s:INODE:%s:NAME",
-                             _g_prefix, name);
-
-            if ((r != NULL) && (strcmp(r->str, entry) == 0))
-            {
-                val = atoi(name);
-            }
-
-            freeReplyObject(r);
+            sprintf(memcommand + strlen(memcommand), " %s:INODE:%s:NAME",
+                    _g_prefix, reply->element[i]->str);
         }
+        redisReply *r = NULL;
+        r = redisCommand(_g_redis, memcommand);
+        for (i = 0; i < reply->elements; i++)
+        {
+            if ((r->element[i] != NULL)
+                && (strcmp(r->element[i]->str, entry) == 0))
+            {
+                val = atoi(reply->element[i]->str);
+            }
+        }
+        freeReplyObject(r);
     }
 
     freeReplyObject(reply);
 
+    free(memcommand);
     free(parent);
     free(entry);
 
@@ -461,8 +465,10 @@ fs_readdir(const char *path,
     /**
      * For each entry in the set ..
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
 
+    char *memcommand = malloc(1048576);
+    sprintf(memcommand, "MGET");
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
       /**
@@ -473,18 +479,23 @@ fs_readdir(const char *path,
        */
         for (i = 0; i < reply->elements; i++)
         {
-            redisReply *r = NULL;
             char *name = reply->element[i]->str;
-
-            r = redisCommand(_g_redis, "GET %s:INODE:%s:NAME",
-                             _g_prefix, name);
-
-            if ((r != NULL))
-                filler(buf, strdup(r->str), NULL, 0);
-
-            freeReplyObject(r);
+            sprintf(memcommand + strlen(memcommand), " %s:INODE:%s:NAME",
+                    _g_prefix, name);
         }
+        redisReply *r = NULL;
+        r = redisCommand(_g_redis, memcommand);
+        for (i = 0; i < reply->elements; i++)
+        {
+
+            if ((r->element[i] != NULL))
+                filler(buf, strdup(r->element[i]->str), NULL, 0);
+
+        }
+        freeReplyObject(r);
     }
+
+    free(memcommand);
 
     freeReplyObject(reply);
 
@@ -543,93 +554,81 @@ fs_getattr(const char *path, struct stat *stbuf)
         return -ENOENT;
     }
 
+
     /**
      * Setup atime, mtime, ctime, and owner/gid.
      */
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:CTIME", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:ATIME", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:MTIME", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:GID", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:UID", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:LINK", _g_prefix, inode);
-    redisAppendCommand(_g_redis, "GET %s:INODE:%d:TYPE", _g_prefix, inode);
-
+    redisAppendCommand(_g_redis,
+                       "MGET %s:INODE:%d:CTIME %s:INODE:%d:ATIME %s:INODE:%d:MTIME %s:INODE:%d:GID %s:INODE:%d:UID %s:INODE:%d:LINK",
+                       _g_prefix, inode, _g_prefix, inode, _g_prefix, inode,
+                       _g_prefix, inode, _g_prefix, inode, _g_prefix, inode,
+                       _g_prefix, inode);
     redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_ctime = atoi(reply->str);
-    freeReplyObject(reply);
-
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_atime = atoi(reply->str);
-    freeReplyObject(reply);
-
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_mtime = atoi(reply->str);
-    freeReplyObject(reply);
-
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_gid = atoi(reply->str);
-    freeReplyObject(reply);
-
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_uid = atoi(reply->str);
+    if ((reply->element[0] != NULL)
+        && (reply->element[0]->type == REDIS_REPLY_STRING))
+        stbuf->st_ctime = atoi(reply->element[0]->str);
+    if ((reply->element[1] != NULL)
+        && (reply->element[1]->type == REDIS_REPLY_STRING))
+        stbuf->st_atime = atoi(reply->element[1]->str);
+    if ((reply->element[2] != NULL)
+        && (reply->element[2]->type == REDIS_REPLY_STRING))
+        stbuf->st_mtime = atoi(reply->element[2]->str);
+    if ((reply->element[3] != NULL)
+        && (reply->element[3]->type == REDIS_REPLY_STRING))
+        stbuf->st_gid = atoi(reply->element[3]->str);
+    if ((reply->element[4] != NULL)
+        && (reply->element[4]->type == REDIS_REPLY_STRING))
+        stbuf->st_uid = atoi(reply->element[3]->str);
+    if ((reply->element[5] != NULL)
+        && (reply->element[5]->type == REDIS_REPLY_STRING))
+        stbuf->st_nlink = atoi(reply->element[4]->str);
+    if ((reply->element[6] != NULL)
+        && (reply->element[6]->type == REDIS_REPLY_STRING))
+        stbuf->st_ctime = atoi(reply->element[5]->str);
     freeReplyObject(reply);
 
     /**
-     * Link count.
+     *  Type - batch up some commands here for later use
      */
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
-        stbuf->st_nlink = atoi(reply->str);
-    freeReplyObject(reply);
-
-    /**
-     *  Entry Type
-     */
-    redisGetReply(_g_redis, (void **)&reply);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING))
+    reply =
+        redisCommand(_g_redis,
+                     "MGET %s:INODE:%d:TYPE %s:INODE:%d:MODE %s:INODE:%d:SIZE",
+                     _g_prefix, inode, _g_prefix, inode, _g_prefix, inode);
+    if ((reply != NULL) && (reply->element[0] != NULL)
+        && (reply->element[0]->type == REDIS_REPLY_STRING))
     {
 
-        redisReply *r =
-            redisCommand(_g_redis, "GET %s:INODE:%d:MODE", _g_prefix, inode);
-        if ((r != NULL) && (r->type == REDIS_REPLY_STRING))
+        if ((reply->element[1] != NULL)
+            && (reply->element[1]->type == REDIS_REPLY_STRING))
         {
-            stbuf->st_mode = atoi(r->str);
+            stbuf->st_mode = atoi(reply->element[1]->str);
         }
-        freeReplyObject(r);
 
-        if (strcmp(reply->str, "DIR") == 0)
+        if (strcmp(reply->element[0]->str, "DIR") == 0)
         {
             stbuf->st_mode |= S_IFDIR;
         }
-        else if (strcmp(reply->str, "LINK") == 0)
+        else if (strcmp(reply->element[0]->str, "LINK") == 0)
         {
             stbuf->st_mode |= S_IFLNK;
             stbuf->st_nlink = 1;
             stbuf->st_size = 0;
         }
-        else if (strcmp(reply->str, "FILE") == 0)
+        else if (strcmp(reply->element[0]->str, "FILE") == 0)
         {
-            /*
-             * Set the size.
-             */
-            redisReply *r =
-                redisCommand(_g_redis, "GET %s:INODE:%d:SIZE", _g_prefix,
-                             inode);
-            if ((r != NULL) && (r->type == REDIS_REPLY_STRING))
+            if ((reply->element[2] != NULL)
+                && (reply->element[2]->type == REDIS_REPLY_STRING))
             {
-                stbuf->st_size = atoi(r->str);
+                if (_g_debug)
+                    fprintf(stderr, "found file\n");
+                stbuf->st_size = atoi(reply->element[2]->str);
             }
-            freeReplyObject(r);
         }
         else
         {
             if (_g_debug)
-                fprintf(stderr, "UNKNOWN ENTRY TYPE: %s\n", reply->str);
+                fprintf(stderr, "UNKNOWN ENTRY TYPE: %s\n",
+                        reply->element[0]->str);
         }
     }
     freeReplyObject(reply);
@@ -683,40 +682,27 @@ fs_mkdir(const char *path, mode_t mode)
     /**
      * Add the entry to the parent directory.
      */
-    redisAppendCommand(_g_redis, "SADD %s:%s %d", _g_prefix, parent, key);
+    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
 
     /**
      * Now populate the new entry.
      */
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:NAME %s",
-                       _g_prefix, key, entry);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:TYPE DIR", _g_prefix, key);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:MODE %d",
-                       _g_prefix, key, mode);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:UID %d",
-                       _g_prefix, key, fuse_get_context()->uid);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:GID %d",
-                       _g_prefix, key, fuse_get_context()->gid);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                       _g_prefix, key, 0);
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:CTIME %d",
-                       _g_prefix, key, time(NULL));
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                       _g_prefix, key, time(NULL));
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
-                       _g_prefix, key, time(NULL));
-    redisAppendCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
-
+    redisAppendCommand(_g_redis,
+                       "MSET %s:INODE:%d:NAME %s %s:INODE:%d:TYPE DIR %s:INODE:%d:MODE %d %s:INODE:%d:UID %d %s:INODE:%d:GID %d %s:INODE:%d:SIZE %d %s:INODE:%d:CTIME %d %s:INODE:%d:MTIME %d %s:INODE:%d:ATIME %d %s:INODE:%d:LINK 1",
+                       _g_prefix, key, entry, _g_prefix, key, _g_prefix, key,
+                       mode, _g_prefix, key, fuse_get_context()->uid,
+                       _g_prefix, key, fuse_get_context()->gid, _g_prefix,
+                       key, 0, _g_prefix, key, time(NULL), _g_prefix, key,
+                       time(NULL), _g_prefix, key, time(NULL), _g_prefix,
+                       key);
     int i = 0;
-    for (i = 0; i < 11; i++)
+    for (i = 0; i < 2; i++)
     {
         redisGetReply(_g_redis, (void **)&reply);
         freeReplyObject(reply);
     }
 
-    /**
-     * Free the memory for the parent/child entries.
-     */
+
     free(parent);
     free(entry);
 
@@ -755,7 +741,7 @@ fs_rmdir(const char *path)
     /**
      * Make sure the directory isn't empty.
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
+    reply = redisCommand(_g_redis, "SMEMBERS %s:%s", _g_prefix, path);
     if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
     {
         if (reply->elements > 0)
@@ -847,47 +833,22 @@ fs_write(const char *path,
             fprintf(stderr, "fs_write->simple(%s);\n", path);
 
       /**
-       * Batch setx2, delete, set new data
+       * MSET inode's size and mtime, delete, set new data
        */
-        redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                           _g_prefix, inode, size);
-        redisAppendCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                           _g_prefix, inode, time(NULL));
-        redisAppendCommand(_g_redis, "DEL %s:INODE:%d:DATA",
-                           _g_prefix, inode);
+        redisAppendCommand(_g_redis,
+                           "MSET %s:INODE:%d:SIZE %d %s:INODE:%d:MTIME %d %s:INODE:%d:DATA %b",
+                           _g_prefix, inode, size, _g_prefix, inode,
+                           time(NULL), _g_prefix, inode, mem, size);
 
-        redisAppendCommand(_g_redis, "SET %s:INODE:%d:DATA %b",
-                           _g_prefix, inode, mem, size);
-
-        redisGetReply(_g_redis, (void **)&reply);
-        freeReplyObject(reply);
-        redisGetReply(_g_redis, (void **)&reply);
-        freeReplyObject(reply);
-        redisGetReply(_g_redis, (void **)&reply);
-        freeReplyObject(reply);
         redisGetReply(_g_redis, (void **)&reply);
         freeReplyObject(reply);
 
         free(mem);
-
     }
     else
     {
         if (_g_debug)
             fprintf(stderr, "fs_write->offsetted(%s);\n", path);
-        int sz;
-        int new_sz;
-        //char *nw;
-
-        /**
-         * Get the current file size.
-         */
-        reply =
-            redisCommand(_g_redis, "GET %s:INODE:%d:SIZE", _g_prefix, inode);
-        sz = atoi(reply->str);
-        freeReplyObject(reply);
-
-        new_sz = offset + size;
 
         /**
          * Copy the new data.
@@ -896,10 +857,10 @@ fs_write(const char *path,
         memcpy(mem, buf, size);
 
         /**
-         * Now store contents.
+         * Now increment the size record and store contents.
          */
-        redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                           _g_prefix, inode, new_sz);
+        redisAppendCommand(_g_redis, "INCRBY %s:INODE:%d:SIZE %d",
+                           _g_prefix, inode, size);
 
         redisAppendCommand(_g_redis, "APPEND %s:INODE:%d:DATA %b",
                            _g_prefix, inode, mem, size);
@@ -912,6 +873,7 @@ fs_write(const char *path,
             redisGetReply(_g_redis, (void **)&reply);
             freeReplyObject(reply);
         }
+
         redisGetReply(_g_redis, (void **)&reply);
         freeReplyObject(reply);
         redisGetReply(_g_redis, (void **)&reply);
@@ -930,9 +892,6 @@ fs_write(const char *path,
 }
 
 
-/**
- * Read the contents of the named file.
- */
 static int
 fs_read(const char *path, char *buf, size_t size, off_t offset,
         struct fuse_file_info *fi)
@@ -983,6 +942,20 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
         redisCommand(_g_redis, "GETRANGE %s:INODE:%d:DATA %lu %lu", _g_prefix,
                      inode, offset, size + offset);
 
+    if ((reply != NULL) && (reply->type == REDIS_REPLY_ERROR))
+    {
+        /**
+         * GETRANGE was renamed - so we'll free the previous command
+         * and retry under the old name.
+         */
+        freeReplyObject(reply);
+
+        reply =
+            redisCommand(_g_redis, "SUBSTR %s:INODE:%d:DATA %lu %lu",
+                         _g_prefix, inode, offset, size + offset);
+
+    }
+
     /**
      * Copy the data into the callee's buffer.
      */
@@ -993,7 +966,6 @@ fs_read(const char *path, char *buf, size_t size, off_t offset,
 
     pthread_mutex_unlock(&_g_lock);
     return size;
-
 }
 
 
@@ -1039,46 +1011,38 @@ fs_symlink(const char *target, const char *path)
     /**
      * Add the entry to the parent directory.
      */
-    reply =
-        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
-    freeReplyObject(reply);
+    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
 
     /**
      * Now populate the new entry.
      */
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s",
-                         _g_prefix, key, entry);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:TYPE LINK",
-                         _g_prefix, key);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:TARGET %s",
-                         _g_prefix, key, target);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d",
-                         _g_prefix, key, 0444);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:UID %d",
-                         _g_prefix, key, fuse_get_context()->uid);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:GID %d",
-                         _g_prefix, key, fuse_get_context()->gid);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                         _g_prefix, key, 0);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:CTIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
-    freeReplyObject(reply);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:NAME %s",
+                       _g_prefix, key, entry);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:TYPE LINK", _g_prefix, key);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:TARGET %s",
+                       _g_prefix, key, target);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:MODE %d",
+                       _g_prefix, key, 0444);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:UID %d",
+                       _g_prefix, key, fuse_get_context()->uid);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:GID %d",
+                       _g_prefix, key, fuse_get_context()->gid);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
+                       _g_prefix, key, 0);
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:CTIME %d",
+                       _g_prefix, key, time(NULL));
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
+                       _g_prefix, key, time(NULL));
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
+                       _g_prefix, key, time(NULL));
+    redisAppendCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
 
+    int i = 0;
+    for (i = 0; i < 11; i++)
+    {
+        redisGetReply(_g_redis, (void **)&reply);
+        freeReplyObject(reply);
+    }
 
     free(parent);
     free(entry);
@@ -1118,8 +1082,7 @@ fs_readlink(const char *path, char *buf, size_t size)
     }
 
     /**
-     * [2/2] Lookup the "TARGET" data item - which will point to the symlink
-     * target.
+     * [2/2] Lookup the "TARGET" data item.
      */
     reply = redisCommand(_g_redis, "GET %s:INODE:%d:TARGET",
                          _g_prefix, inode);
@@ -1229,42 +1192,26 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     /**
      * Add the entry to the parent directory.
      */
-    reply =
-        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
-    freeReplyObject(reply);
+    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
 
     /**
-     * Now populate the new entry.
+     * Now populate the new entry, using MSET
      */
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s",
-                         _g_prefix, key, entry);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:TYPE FILE",
-                         _g_prefix, key);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d",
-                         _g_prefix, key, mode);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:UID %d",
-                         _g_prefix, key, fuse_get_context()->uid);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:GID %d",
-                         _g_prefix, key, fuse_get_context()->gid);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:SIZE %d",
-                         _g_prefix, key, 0);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:CTIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d",
-                         _g_prefix, key, time(NULL));
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:LINK 1", _g_prefix, key);
-    freeReplyObject(reply);
+    redisAppendCommand(_g_redis,
+                       "MSET %s:INODE:%d:NAME %s %s:INODE:%d:TYPE FILE %s:INODE:%d:MODE %d %s:INODE:%d:UID %d %s:INODE:%d:GID %d %s:INODE:%d:SIZE %d %s:INODE:%d:CTIME %d %s:INODE:%d:MTIME %d %s:INODE:%d:ATIME %d %s:INODE:%d:LINK 1",
+                       _g_prefix, key, entry, _g_prefix, key, _g_prefix, key,
+                       mode, _g_prefix, key, fuse_get_context()->uid,
+                       _g_prefix, key, fuse_get_context()->gid, _g_prefix,
+                       key, 0, _g_prefix, key, time(NULL), _g_prefix, key,
+                       time(NULL), _g_prefix, key, time(NULL), _g_prefix,
+                       key);
+
+    int i = 0;
+    for (i = 0; i < 2; i++)
+    {
+        redisGetReply(_g_redis, (void **)&reply);
+        freeReplyObject(reply);
+    }
 
     free(parent);
     free(entry);
@@ -1302,7 +1249,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
     /**
      * To change the ownership of this file we need to :
      *
-     * [1/4] Find the inode for this entry.
+     * [1/2] Find the inode for this entry.
      *
      */
     inode = find_inode(path);
@@ -1313,28 +1260,14 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
     }
 
     /**
-     * [2/4] Change the UID
+     * [2/2] Change the UID, GID, mtime
      */
     reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:UID %d", _g_prefix, inode,
-                     uid);
+        redisCommand(_g_redis,
+                     "MSET %s:INODE:%d:UID %d %s:INODE:%d:GID %d %s:INODE:%d:MTIME %d",
+                     _g_prefix, inode, uid, _g_prefix, inode, gid, _g_prefix,
+                     inode, time(NULL));
     freeReplyObject(reply);
-
-    /**
-     * [3/4] Change the GID
-     */
-    reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:GID %d", _g_prefix, inode,
-                     gid);
-    freeReplyObject(reply);
-
-    /**
-     * [4/4] change the mtime.
-     */
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                         _g_prefix, inode, time(NULL));
-    freeReplyObject(reply);
-
 
     /**
      * All done.
@@ -1373,7 +1306,7 @@ fs_chmod(const char *path, mode_t mode)
     /**
      * To change the owner of this file we need to:
      *
-     * [1/3] Find the inode for this entry.
+     * [1/2] Find the inode for this entry.
      *
      */
     inode = find_inode(path);
@@ -1384,18 +1317,12 @@ fs_chmod(const char *path, mode_t mode)
     }
 
     /**
-     * [2/3] Change the mode
+     * [2/2] Change the mode
      */
     reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:MODE %d", _g_prefix, inode,
-                     mode);
-    freeReplyObject(reply);
-
-    /**
-     * [3/3] Change the mtime.
-     */
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                         _g_prefix, inode, time(NULL));
+        redisCommand(_g_redis,
+                     "MSET %s:INODE:%d:MODE %d %s:INODE:%d:MTIME %d",
+                     _g_prefix, inode, mode, _g_prefix, inode, time(NULL));
     freeReplyObject(reply);
 
     /**
@@ -1448,11 +1375,9 @@ fs_utimens(const char *path, const struct timespec tv[2])
      * [2/2] Change the time
      */
     reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:ATIME %d", _g_prefix, inode,
-                     tv[0].tv_sec);
-    freeReplyObject(reply);
-    reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d", _g_prefix, inode,
+        redisCommand(_g_redis,
+                     "MSET %s:INODE:%d:ATIME %d %s:INODE:%d:MTIME %d",
+                     _g_prefix, inode, tv[0].tv_sec, _g_prefix, inode,
                      tv[1].tv_sec);
     freeReplyObject(reply);
 
@@ -1655,7 +1580,7 @@ fs_rename(const char *old, const char *path)
       /**
        * Rename the key which holds subdirectory names.
        */
-        reply = redisCommand(_g_redis, "renamenx %s:%s %s:%s", _g_prefix, old,
+        reply = redisCommand(_g_redis, "RENAMENX %s:%s %s:%s", _g_prefix, old,
                              _g_prefix, path);
         freeReplyObject(reply);
     }
@@ -1663,9 +1588,9 @@ fs_rename(const char *old, const char *path)
     /**
      * Finally we flush any cached INODE lookup results.
      */
-    reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, old);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, path);
+    reply =
+        redisCommand(_g_redis, "DEL %s:PATH:%s %s:PATH:%s", _g_prefix, old,
+                     _g_prefix, path);
     freeReplyObject(reply);
 
     pthread_mutex_unlock(&_g_lock);
@@ -1736,10 +1661,8 @@ fs_truncate(const char *path, off_t size)
      * [3/3] Reset the size & mtime.
      */
     reply =
-        redisCommand(_g_redis, "SET %s:INODE:%d:SIZE 0", _g_prefix, inode);
-    freeReplyObject(reply);
-    reply = redisCommand(_g_redis, "SET %s:INODE:%d:MTIME %d",
-                         _g_prefix, inode, time(NULL));
+        redisCommand(_g_redis, "MSET %s:INODE:%d:SIZE 0 %s:INODE:%d:MTIME %d",
+                     _g_prefix, inode, _g_prefix, inode, time(NULL));
     freeReplyObject(reply);
 
     pthread_mutex_unlock(&_g_lock);
