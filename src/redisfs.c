@@ -129,8 +129,6 @@ int _g_fast = 0;
 int _g_read_only = 0;
 
 
-int _g_lastcheck = 0;
-
 
 
 /**
