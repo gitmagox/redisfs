@@ -286,10 +286,10 @@ remove_inode(int inode)
     i = 0;
     while (names[i] != NULL)
     {
-      redisGetReply(_g_redis, (void **)&reply);
-      if ( ( reply != NULL ) && ( reply->type == REDIS_REPLY_ERROR ) )
+        redisGetReply(_g_redis, (void **)&reply);
+        if ((reply != NULL) && (reply->type == REDIS_REPLY_ERROR))
         {
-          fprintf(stderr, "ERROR DELETING: %s\n", reply->str);
+            fprintf(stderr, "ERROR DELETING: %s\n", reply->str);
 
         }
         freeReplyObject(reply);
