@@ -105,6 +105,17 @@ else
     exit;
 }
 
+
+#
+#  Speed tests
+#
+print "Speed test - Output: 1Gb\n";
+system( "dd if=/dev/zero of=/mnt/redis/zero bs=1024k count=1024" );
+
+print "Speed test - Input: 1Gb\n";
+system( "dd if=/mnt/redis/zero of=/dev/zero bs=1024k count=1024" );
+
+
 #
 #  TODO:  More tests.
 #
