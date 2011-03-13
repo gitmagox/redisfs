@@ -17,9 +17,13 @@
  *
  * (Symbolic links / symlinks are supported though.)
  *
- *  Each file/directory which is created is allocated a unique
- * numeric identifier - from that we store the meta-data of the entry
- * itself inside redis keys.
+ *
+ * FILES
+ *
+ *********
+ *
+ *  Each file which is created is allocated a unique numeric identifier,
+ * and from that we store the meta-data of the entry itself inside redis keys.
  *
  *  For example the file "/etc/passwd" might have the identifier "6".
  * which would lead to keys such as:
@@ -39,13 +43,22 @@
  *  (Here "SKX:" is the key-prefix.  We need to allow this such that
  * more than one filesystem may be mounted against a single redis-server.)
  *
- *  Each directory created will have references to their contents
- * stored in a SET named after the directory.
  *
- *  For example a top level directory containing "/etc" (uid=6) and
- * "/bin" (uid=7)" will look like this:
+ * Directories
  *
- *   SKX:/ -> [ 6, 7 ]
+ **************
+ *
+ *  Handling directories is a little more complex, and we rely upon
+ * redis "sets" to do the heavy lifting.  Rather than have directories
+ * be based upon filesystem paths we handle them in a similar fashion to
+ * directory entries.
+ *
+ *  Given a directory "/foo" we find the INODE for that entry, and
+ * assuming that is "43" then the elements of that directory are
+ * stored in the set:
+ *
+ *  SKX:DIRENT:43
+ *
  *
  * </overview>
  *
@@ -302,6 +315,7 @@ int
 find_inode(const char *path)
 {
     int val = -1;
+    int parent_inode = 0;
     char *parent;
     char *entry;
     redisReply *reply = NULL;
@@ -309,32 +323,13 @@ find_inode(const char *path)
     if (_g_debug)
         fprintf(stderr, "find_inode(%s)\n", path);
 
-    redis_alive();
-
     /**
-     * See if we have this cached.
+     * Special Case "/" is 99.
      */
-    reply = redisCommand(_g_redis, "GET %s:PATH:%s", _g_prefix, path);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_STRING) &&
-        (reply->str != NULL))
-    {
-        val = atoi(reply->str);
-        freeReplyObject(reply);
-        if (val != -1)
-        {
-            if (_g_debug)
-                fprintf(stderr, "find_inode(%s)->hit\n", path);
-            return val;
-        }
-        else
-        {
-          /**
-           * Avoid a future cache failure.
-           */
-            reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, path);
-            freeReplyObject(reply);
-        }
-    }
+    if ((strcmp(path, "/") == 0) && strlen(path) == 1)
+        return -99;
+
+    redis_alive();
 
   /**
    * OK we have a directory entry.
@@ -343,13 +338,16 @@ find_inode(const char *path)
    * and then we can lookup the entry itself.
    */
     parent = get_parent(path);
+    parent_inode = find_inode(parent);
     entry = get_basename(path);
 
 
   /**
    * For each entry in the set we need to add the name.
    */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, parent);
+    reply =
+        redisCommand(_g_redis, "SMEMBERS %s:DIRENT:%d", _g_prefix,
+                     parent_inode);
 
     char *memcommand = malloc(1048576);
     sprintf(memcommand, "MGET");
@@ -379,16 +377,6 @@ find_inode(const char *path)
     free(memcommand);
     free(parent);
     free(entry);
-
-    /**
-     * Save in cache - if we got a hit
-     */
-    if (val != -1)
-    {
-        reply = redisCommand(_g_redis, "SET %s:PATH:%s %d",
-                             _g_prefix, path, val);
-        freeReplyObject(reply);
-    }
 
     if (_g_debug)
         fprintf(stderr, "find_inode(%s) -> %d\n", path, val);
@@ -450,6 +438,8 @@ fs_readdir(const char *path,
 {
     redisReply *reply = NULL;
     int i;
+    int inode;
+
 
     pthread_mutex_lock(&_g_lock);
 
@@ -467,7 +457,15 @@ fs_readdir(const char *path,
     /**
      * For each entry in the set ..
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
+
+
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIRENT:%d", _g_prefix, inode);
 
     char *memcommand = malloc(1048576);
     sprintf(memcommand, "MGET");
@@ -652,7 +650,8 @@ fs_mkdir(const char *path, mode_t mode)
     redisReply *reply = NULL;
     char *parent = NULL;
     char *entry = NULL;
-    int key = 0;
+    int new_inode = 0;
+    int parent_inode = 0;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -678,25 +677,27 @@ fs_mkdir(const char *path, mode_t mode)
      */
     parent = get_parent(path);
     entry = get_basename(path);
-    key = get_next_inode();
-
+    new_inode = get_next_inode();
+    parent_inode = find_inode(parent);
 
     /**
      * Add the entry to the parent directory.
      */
-    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    redisAppendCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+                       parent_inode, new_inode);
 
     /**
      * Now populate the new entry.
      */
     redisAppendCommand(_g_redis,
                        "MSET %s:INODE:%d:NAME %s %s:INODE:%d:TYPE DIR %s:INODE:%d:MODE %d %s:INODE:%d:UID %d %s:INODE:%d:GID %d %s:INODE:%d:SIZE %d %s:INODE:%d:CTIME %d %s:INODE:%d:MTIME %d %s:INODE:%d:ATIME %d %s:INODE:%d:LINK 1",
-                       _g_prefix, key, entry, _g_prefix, key, _g_prefix, key,
-                       mode, _g_prefix, key, fuse_get_context()->uid,
-                       _g_prefix, key, fuse_get_context()->gid, _g_prefix,
-                       key, 0, _g_prefix, key, time(NULL), _g_prefix, key,
-                       time(NULL), _g_prefix, key, time(NULL), _g_prefix,
-                       key);
+                       _g_prefix, new_inode, entry, _g_prefix, new_inode,
+                       _g_prefix, new_inode, mode, _g_prefix, new_inode,
+                       fuse_get_context()->uid, _g_prefix, new_inode,
+                       fuse_get_context()->gid, _g_prefix, new_inode, 0,
+                       _g_prefix, new_inode, time(NULL), _g_prefix, new_inode,
+                       time(NULL), _g_prefix, new_inode, time(NULL),
+                       _g_prefix, new_inode);
     int i = 0;
     for (i = 0; i < 2; i++)
     {
@@ -719,7 +720,8 @@ fs_mkdir(const char *path, mode_t mode)
 static int
 fs_rmdir(const char *path)
 {
-    int inode;
+    int parent_inode = 0;
+    int inode = 0;
     redisReply *reply = NULL;
     char *parent = NULL;
 
@@ -741,48 +743,45 @@ fs_rmdir(const char *path)
 
 
     /**
-     * Make sure the directory isn't empty.
+     * Ensure we're working on a directory.
      */
-    reply = redisCommand(_g_redis, "SMEMBERS %s:DIR:%s", _g_prefix, path);
-    if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
-    {
-        if (reply->elements > 0)
-        {
-            freeReplyObject(reply);
-            pthread_mutex_unlock(&_g_lock);
-            return -ENOTEMPTY;
-        }
-        freeReplyObject(reply);
-    }
-
-    /**
-     * To remove the entry we need to :
-     *
-     * [1/4] Find the inode for this entry.
-     *
-     */
-    inode = find_inode(path);
-
-    if (inode == -1)
+    if (!is_directory(path))
     {
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
 
-    /**
-     * [2/4] Remove from the set.
-     */
-    parent = get_parent(path);
-    reply =
-        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
-    freeReplyObject(reply);
-    free(parent);
 
     /**
-     * [3/4] Remove the cached INODE number.
+     * [1/4] Make sure the directory isn't empty.
      */
-    reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, path);
+    // TODO
+
+    /**
+     * To remove the entry we need to :
+     *
+     * [2/4] Find the inode for this entry.
+     *
+     */
+    parent = get_parent(path);
+    parent_inode = find_inode(parent);
+    inode = find_inode(path);
+
+    if (inode == -1)
+    {
+        free(parent);
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
+    /**
+     * [3/4] Remove from the directory of the parent.
+     */
+    reply =
+        redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,
+                     parent_inode, inode);
     freeReplyObject(reply);
+    free(parent);
 
     /**
      * [4/4] Remove all meta-data.
@@ -894,6 +893,9 @@ fs_write(const char *path,
 }
 
 
+/**
+ * Read from a file.
+ */
 static int
 fs_read(const char *path, char *buf, size_t size, off_t offset,
         struct fuse_file_info *fi)
@@ -982,6 +984,7 @@ fs_symlink(const char *target, const char *path)
     char *parent = NULL;
     char *entry = NULL;
     int key = 0;
+    int parent_inode = 0;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -1006,6 +1009,8 @@ fs_symlink(const char *target, const char *path)
      * in the set for the parent directory.
      */
     parent = get_parent(path);
+    parent_inode = find_inode(parent);
+
     entry = get_basename(path);
     key = get_next_inode();
 
@@ -1013,7 +1018,8 @@ fs_symlink(const char *target, const char *path)
     /**
      * Add the entry to the parent directory.
      */
-    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    redisAppendCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+                       parent_inode, key);
 
     /**
      * Now populate the new entry.
@@ -1163,6 +1169,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     char *parent = NULL;
     char *entry = NULL;
     int key = 0;
+    int parent_inode = 0;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -1187,6 +1194,8 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
      * in the set for the parent directory.
      */
     parent = get_parent(path);
+    parent_inode = find_inode(parent);
+
     entry = get_basename(path);
     key = get_next_inode();
 
@@ -1194,7 +1203,8 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     /**
      * Add the entry to the parent directory.
      */
-    redisAppendCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent, key);
+    redisAppendCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+                       parent_inode, key);
 
     /**
      * Now populate the new entry, using MSET
@@ -1446,6 +1456,7 @@ fs_unlink(const char *path)
     int inode;
     redisReply *reply = NULL;
     char *parent = NULL;
+    int parent_inode = 0;
 
     pthread_mutex_lock(&_g_lock);
 
@@ -1477,19 +1488,16 @@ fs_unlink(const char *path)
     }
 
     /**
-     * [2/4] Remove from the set.
+     * [2/4] Remove from the parent set.
      */
     parent = get_parent(path);
+    parent_inode = find_inode(parent);
+
     reply =
-        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent, inode);
+        redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,
+                     parent_inode, inode);
     freeReplyObject(reply);
     free(parent);
-
-    /**
-     * [3/4] Remove the cached INODE number.
-     */
-    reply = redisCommand(_g_redis, "DEL %s:PATH:%s", _g_prefix, path);
-    freeReplyObject(reply);
 
     /**
      * [4/4] Remove all meta-data.
@@ -1508,7 +1516,7 @@ int
 fs_rename(const char *old, const char *path)
 {
     int old_inode = -1;
-    int is_dir = -1;
+    int parent_inode = 0;
     redisReply *reply = NULL;
 
     pthread_mutex_lock(&_g_lock);
@@ -1556,9 +1564,10 @@ fs_rename(const char *old, const char *path)
      * Find the old parent and remove this file from the set.
      */
     char *parent = get_parent(old);
+    parent_inode = find_inode(parent);
     reply =
-        redisCommand(_g_redis, "SREM %s:DIR:%s %d", _g_prefix, parent,
-                     old_inode);
+        redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,
+                     parent_inode, old_inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1566,34 +1575,12 @@ fs_rename(const char *old, const char *path)
      * Find the new parent - and add this member to the set.
      */
     parent = get_parent(path);
+    parent_inode = find_inode(parent);
     reply =
-        redisCommand(_g_redis, "SADD %s:DIR:%s %d", _g_prefix, parent,
-                     old_inode);
+        redisCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+                     parent_inode, old_inode);
     freeReplyObject(reply);
     free(parent);
-
-
-    /**
-     * We'll need to be clever if we're renaming a directory.
-     */
-    is_dir = is_directory(old);
-    if (is_dir)
-    {
-      /**
-       * Rename the key which holds subdirectory names.
-       */
-        reply = redisCommand(_g_redis, "RENAMENX %s:%s %s:%s", _g_prefix, old,
-                             _g_prefix, path);
-        freeReplyObject(reply);
-    }
-
-    /**
-     * Finally we flush any cached INODE lookup results.
-     */
-    reply =
-        redisCommand(_g_redis, "DEL %s:PATH:%s %s:PATH:%s", _g_prefix, old,
-                     _g_prefix, path);
-    freeReplyObject(reply);
 
     pthread_mutex_unlock(&_g_lock);
 
