@@ -62,22 +62,29 @@ system("redis-cli flushdb 2>/dev/null >/dev/null");
 
 
 #
-#  Count the keys in the filesystem
+#  Count the keys stored in redis.
 #
 my $keys = countKeys();
 print "\nThere is $keys key present in redis.\n";
 
 
 #
+#  Number of random files to create.
+#
+my $fc = 1000;
+
+
+#
 #  Create some random files.
 #
 print "\n";
-for ( my $i = 0 ; $i < 256 ; $i++ )
+for ( my $i = 0 ; $i < $fc ; $i++ )
 {
-    print "\rCreating random file $i/256";
+    print "\rCreating random file $i/$fc";
     createRandomFile("/mnt/redis/$i");
 }
 print "\r\n";
+
 
 #
 #  Remove all files.
@@ -90,17 +97,20 @@ foreach my $file ( sort( glob("/mnt/redis/*") ) )
     $found += 1;
 }
 
-if ( $found != 256 )
+#
+#  Ensure we removed the number of files we expected to.
+#
+if ( $found != $fc )
 {
     print "Failed to unlink the number of files we should have created.\n";
-    print "Expected 256 - found $found\n";
+    print "Expected $fc - found $found\n";
     exit 0;
 }
 
 print "\r\n";
 
 #
-#  Keys should be one.
+#  The number of keys in our database should still be one.
 #
 my $endKeys = countKeys();
 print "\nThere is now $keys key present in redis.\n";
@@ -119,11 +129,32 @@ else
 #
 #  Speed tests
 #
-print "Speed test - Output: 1Gb\n";
-system( "dd if=/dev/zero of=/mnt/redis/zero bs=1024k count=1024" );
+print "\nSpeed test - Output: 1Gb\n";
+system("dd if=/dev/zero of=/mnt/redis/zero bs=1024k count=1024");
 
 print "Speed test - Input: 1Gb\n";
-system( "dd if=/mnt/redis/zero of=/dev/zero bs=1024k count=1024" );
+system("dd if=/mnt/redis/zero of=/dev/zero bs=1024k count=1024");
+
+#
+#  Remove the temporary file.
+#
+unlink("/mnt/redis/zero");
+
+#
+#  The number of keys in our database should still be one.
+#
+my $kc = countKeys();
+print "\nThere is now $keys key present in redis.\n";
+
+if ( $kc == 1 )
+{
+    print "OK: No leaks detected\n";
+}
+else
+{
+    print "FAIL: We've leaked a number of keys somewhere!\n";
+    exit;
+}
 
 
 #
