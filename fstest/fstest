@@ -82,11 +82,21 @@ print "\r\n";
 #
 #  Remove all files.
 #
+my $found = 0;
 foreach my $file ( sort( glob("/mnt/redis/*") ) )
 {
     print "\rRemoving file: $file";
     unlink($file) if ( -e $file );
+    $found += 1;
 }
+
+if ( $found != 256 )
+{
+    print "Failed to unlink the number of files we should have created.\n";
+    print "Expected 256 - found $found\n";
+    exit 0;
+}
+
 print "\r\n";
 
 #
