@@ -418,6 +418,42 @@ is_directory(const char *path)
 }
 
 
+/**
+ * Return the number of directory entries a directory has.
+ */
+int
+count_directory_entries(const char *path)
+{
+    int ret = 0;
+    int inode = 0;
+    redisReply *reply = NULL;
+
+    if (_g_debug)
+        fprintf(stderr, "count_directory_entries(%s)\n", path);
+
+    redis_alive();
+
+  /**
+   * Find the inode of the directory.
+   */
+    inode = find_inode(path);
+
+  /**
+   * Now retrieve the entries.
+   */
+    reply = redisCommand(_g_redis, "SMEMBERS %s:DIRENT:%d", _g_prefix, inode);
+
+    /**
+     * If that worked we know the number of elements.
+     */
+    if ((reply != NULL) && (reply->type == REDIS_REPLY_ARRAY))
+    {
+        ret = reply->elements;
+    }
+    freeReplyObject(reply);
+
+    return (ret);
+}
 
 
 /**
@@ -755,7 +791,11 @@ fs_rmdir(const char *path)
     /**
      * [1/4] Make sure the directory isn't empty.
      */
-    // TODO
+    if (count_directory_entries(path) != 0)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOTEMPTY;
+    }
 
     /**
      * To remove the entry we need to :
