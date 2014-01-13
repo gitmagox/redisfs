@@ -67,7 +67,7 @@ char _g_new_prefix[20] = { "snapshot" };
 void
 redis_alive()
 {
-    struct timeval timeout = { 1, 5000000 };    // 1.5 seconds
+    struct timeval timeout = { 1, 5000000 };    // 5 seconds
     redisReply *reply = NULL;
 
     /**
