@@ -470,8 +470,10 @@ count_directory_entries(const char *path)
 static int
 fs_readdir(const char *path,
            void *buf,
-           fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+           fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
+    (void) fi;
+    (void) flags;
     redisReply *reply = NULL;
     int i;
     int inode;
@@ -544,8 +546,9 @@ fs_readdir(const char *path,
  * Get the attributes of each file.
  */
 static int
-fs_getattr(const char *path, struct stat *stbuf)
+fs_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi)
 {
+    (void) fi;
     int inode;
     redisReply *reply = NULL;
 
@@ -1277,8 +1280,9 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
  * Change the owner of a file/directory.
  */
 static int
-fs_chown(const char *path, uid_t uid, gid_t gid)
+fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
 {
+    (void) fi;
     int inode;
     redisReply *reply = NULL;
 
@@ -1334,8 +1338,9 @@ fs_chown(const char *path, uid_t uid, gid_t gid)
  * Change the permission(s) of a file/directory.
  */
 static int
-fs_chmod(const char *path, mode_t mode)
+fs_chmod(const char *path, mode_t modem,struct fuse_file_info *fi)
 {
+    (void) fi;
     int inode;
     redisReply *reply = NULL;
 
@@ -1390,8 +1395,9 @@ fs_chmod(const char *path, mode_t mode)
  * Change the access time of a file.
  */
 static int
-fs_utimens(const char *path, const struct timespec tv[2])
+fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *fi)
 {
+    (void) fi;
     int inode;
     redisReply *reply = NULL;
 
@@ -1553,7 +1559,7 @@ fs_unlink(const char *path)
  * Rename a directory entry.
  */
 int
-fs_rename(const char *old, const char *path)
+fs_rename(const char *old, const char *path, unsigned int flags)
 {
     int old_inode = -1;
     int parent_inode = 0;
@@ -1561,6 +1567,8 @@ fs_rename(const char *old, const char *path)
 
     pthread_mutex_lock(&_g_lock);
 
+    if (flags)
+        return -EINVAL;
     if (_g_debug)
         fprintf(stderr, "fs_rename(%s,%s);\n", old, path);
 
@@ -1636,8 +1644,9 @@ fs_rename(const char *old, const char *path)
  *
  */
 static int
-fs_truncate(const char *path, off_t size)
+fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
 {
+    (void) fi;
     int inode;
     redisReply *reply = NULL;
 
