@@ -487,8 +487,8 @@ fs_readdir(const char *path,
     /**
      * Add the filesystem entries which always exist.
      */
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
+    filler(buf, ".", NULL, 0,0);
+    filler(buf, "..", NULL, 0,0);
 
     /**
      * For each entry in the set ..
@@ -525,7 +525,7 @@ fs_readdir(const char *path,
         {
 
             if ((r->element[i] != NULL))
-                filler(buf, strdup(r->element[i]->str), NULL, 0);
+                filler(buf, strdup(r->element[i]->str), NULL, 0,0);
 
         }
         freeReplyObject(r);
