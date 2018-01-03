@@ -122,7 +122,7 @@ redisContext *_g_redis = NULL;
  */
 int _g_redis_port = 6379;
 char _g_redis_host[100] = { "localhost" };
-
+char _g_redis_password[100] = { "123456" };
 
 /**
  * Are we running with --debug in play?
@@ -188,6 +188,14 @@ redis_alive()
         if (_g_debug)
             fprintf(stderr, "Reconnected to redis server on [%s:%d]\n",
                     _g_redis_host, _g_redis_port);
+
+        reply= redisCommand(_g_debug, "AUTH %s", _g_redis_password);
+        if (reply->type == REDIS_REPLY_ERROR) {
+           fprintf(stderr, "password is wrong [%s] check it right.\n",
+                           _g_redis_password);
+                   exit(1);
+        }
+        freeReplyObject(reply);
     }
 }
 
@@ -1838,6 +1846,7 @@ main(int argc, char *argv[])
             {"host", required_argument, 0, 's'},
             {"mount", required_argument, 0, 'm'},
             {"port", required_argument, 0, 'P'},
+            {"password",required_argument, 0, 'a'},
             {"prefix", required_argument, 0, 'p'},
             {"read-only", no_argument, 0, 'r'},
             {"version", no_argument, 0, 'v'},
@@ -1845,7 +1854,7 @@ main(int argc, char *argv[])
         };
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "s:P:m:p:drhvf", long_options,
+        c = getopt_long(argc, argv, "s:P:a:m:p:drhvf", long_options,
                         &option_index);
 
         /*
@@ -1878,6 +1887,9 @@ main(int argc, char *argv[])
             break;
         case 'm':
             snprintf(_g_mount, sizeof(_g_mount) - 1, "%s", optarg);
+            break;
+        case 'a':
+            snprintf(_g_redis_password, sizeof(_g_redis_password) - 1, "%s", optarg);
             break;
         case 'd':
           /**
