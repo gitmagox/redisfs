@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="98a3bfe2-a44e-4544-b84d-92b02b38c6a9" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/README.md" afterPath="$PROJECT_DIR$/README.md" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/redisfs.c" afterPath="$PROJECT_DIR$/src/redisfs.c" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -23,22 +23,22 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="redisfs.c" pinned="false" current-in-tab="false">
+      <file leaf-file-name="redisfs.c" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/redisfs.c">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="514">
-              <caret line="1848" column="22" lean-forward="false" selection-start-line="1848" selection-start-column="14" selection-end-line="1848" selection-end-column="22" />
+            <state relative-caret-position="501">
+              <caret line="197" column="31" lean-forward="true" selection-start-line="197" selection-start-column="31" selection-end-line="197" selection-end-column="31" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="README.md" pinned="false" current-in-tab="true">
+      <file leaf-file-name="README.md" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/README.md">
           <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
             <state split_layout="SPLIT">
-              <first_editor relative-caret-position="666">
-                <caret line="97" column="5" lean-forward="true" selection-start-line="97" selection-start-column="5" selection-end-line="97" selection-end-column="5" />
+              <first_editor relative-caret-position="2175">
+                <caret line="87" column="0" lean-forward="true" selection-start-line="87" selection-start-column="0" selection-end-line="87" selection-end-column="0" />
                 <folding />
               </first_editor>
               <second_editor />
@@ -140,6 +140,8 @@
       <find>getopt_long</find>
       <find>redisContextConnectTcp</find>
       <find>fuse_main</find>
+      <find>redisCommand</find>
+      <find>redis_alive(</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -154,8 +156,8 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/src/Makefile" />
-        <option value="$PROJECT_DIR$/src/redisfs.c" />
         <option value="$PROJECT_DIR$/README.md" />
+        <option value="$PROJECT_DIR$/src/redisfs.c" />
       </list>
     </option>
   </component>
@@ -192,11 +194,6 @@
             <path>
               <item name="redisfs" type="b2602c69:ProjectViewProjectNode" />
               <item name="redisfs" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="redisfs" type="b2602c69:ProjectViewProjectNode" />
-              <item name="redisfs" type="462c0819:PsiDirectoryNode" />
-              <item name="hiredis" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="redisfs" type="b2602c69:ProjectViewProjectNode" />
@@ -326,12 +323,12 @@
       <option name="presentableId" value="Default" />
       <updated>1514961978301</updated>
       <workItem from="1514961979838" duration="4000" />
-      <workItem from="1514961985537" duration="8026000" />
+      <workItem from="1514961985537" duration="8468000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="8030000" />
+    <option name="totallyTimeSpent" value="8472000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="1912" y="-8" width="1936" height="1096" extended-state="6" />
@@ -561,22 +558,22 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/redisfs.c">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="514">
-          <caret line="1848" column="22" lean-forward="false" selection-start-line="1848" selection-start-column="14" selection-end-line="1848" selection-end-column="22" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/README.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
         <state split_layout="SPLIT">
-          <first_editor relative-caret-position="666">
-            <caret line="97" column="5" lean-forward="true" selection-start-line="97" selection-start-column="5" selection-end-line="97" selection-end-column="5" />
+          <first_editor relative-caret-position="2175">
+            <caret line="87" column="0" lean-forward="true" selection-start-line="87" selection-start-column="0" selection-end-line="87" selection-end-column="0" />
             <folding />
           </first_editor>
           <second_editor />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/redisfs.c">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="501">
+          <caret line="197" column="31" lean-forward="true" selection-start-line="197" selection-start-column="31" selection-end-line="197" selection-end-column="31" />
+          <folding />
         </state>
       </provider>
     </entry>

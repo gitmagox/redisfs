@@ -189,7 +189,7 @@ redis_alive()
             fprintf(stderr, "Reconnected to redis server on [%s:%d]\n",
                     _g_redis_host, _g_redis_port);
 
-        reply= redisCommand(_g_debug, "AUTH %s", _g_redis_password);
+        reply= redisCommand(_g_redis, "AUTH %s", _g_redis_password);
         if (reply->type == REDIS_REPLY_ERROR) {
            fprintf(stderr, "password is wrong [%s] check it right.\n",
                            _g_redis_password);
