@@ -92,7 +92,7 @@ software, via:
 By default this will attempt to connect to a redis server running upon
 the same host - if you wish to connect to a remote machine please execute:
 
-     # ./src/redisfs --host remote.example.org [--port=6379]
+     # ./src/redisfs --host remote.example.org [--port=6379][--password=redispassword]
 
 
 Steve
