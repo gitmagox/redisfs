@@ -1338,7 +1338,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
  * Change the permission(s) of a file/directory.
  */
 static int
-fs_chmod(const char *path, mode_t modem,struct fuse_file_info *fi)
+fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
 {
     (void) fi;
     int inode;
