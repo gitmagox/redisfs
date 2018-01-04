@@ -1818,7 +1818,7 @@ main(int argc, char *argv[])
     char *args[] = {
         "fuse-redisfs", _g_mount,
         "-o", "allow_other",
-        "-o", "nonempty",
+       // "-o", "nonempty",
         "-f",
         "-o", "debug",
         NULL
