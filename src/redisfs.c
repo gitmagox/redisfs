@@ -1052,12 +1052,6 @@ fs_symlink(const char *target, const char *path)
     }
 
     redis_alive();
-    inode = find_inode(path);
-    if (inode == -1)
-    {
-        pthread_mutex_unlock(&_g_lock);
-        return 0;
-    }
 
     /**
      * We need to create a new INODE number & entry.
@@ -1221,8 +1215,9 @@ fs_open(const char *path, struct fuse_file_info *fi)
 static int
 fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    int inode;
+
     redisReply *reply = NULL;
+    int inode;
     char *parent = NULL;
     char *entry = NULL;
     int key = 0;
@@ -1243,7 +1238,12 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     }
 
     redis_alive();
-
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
     /**
      * We need to create a new INODE number & entry.
      *
