@@ -1052,6 +1052,12 @@ fs_symlink(const char *target, const char *path)
     }
 
     redis_alive();
+    inode = find_inode(path);
+    if (inode == -1)
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return 0;
+    }
 
     /**
      * We need to create a new INODE number & entry.
