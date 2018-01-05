@@ -1239,7 +1239,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
     redis_alive();
     inode = find_inode(path);
-    if (inode == -1)
+    if (inode != -1)
     {
         pthread_mutex_unlock(&_g_lock);
         return 0;
