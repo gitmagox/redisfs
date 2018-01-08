@@ -1581,9 +1581,10 @@ fs_rename(const char *old, const char *path, unsigned int flags)
 
     pthread_mutex_lock(&_g_lock);
 
-    if (flags)
+    if (flags){
         pthread_mutex_unlock(&_g_lock);
         return -EINVAL;
+    }
     if (_g_debug)
         fprintf(stderr, "fs_rename(%s,%s);\n", old, path);
 
