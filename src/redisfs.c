@@ -1582,6 +1582,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     pthread_mutex_lock(&_g_lock);
 
     if (flags)
+        pthread_mutex_unlock(&_g_lock);
         return -EINVAL;
     if (_g_debug)
         fprintf(stderr, "fs_rename(%s,%s);\n", old, path);
@@ -1627,9 +1628,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
      */
     char *parent = get_parent(old);
     parent_inode = find_inode(parent);
-    reply =
-        redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,
-                     parent_inode, old_inode);
+    reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,parent_inode, old_inode);
     freeReplyObject(reply);
     free(parent);
 
@@ -1638,8 +1637,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
      */
     parent = get_parent(path);
     parent_inode = find_inode(parent);
-    reply =
-        redisCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+    reply =redisCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
                      parent_inode, old_inode);
     freeReplyObject(reply);
     free(parent);
