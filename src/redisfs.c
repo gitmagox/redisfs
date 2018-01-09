@@ -1612,36 +1612,68 @@ fs_rename(const char *old, const char *path, unsigned int flags)
         return -ENOENT;
     }
 
-    /**
-     * Update the name of the key, which is the filename of the
-     * directory entry - minus directory suffix.
-     */
+//    /**
+//     * Update the name of the key, which is the filename of the
+//     * directory entry - minus directory suffix.
+//     */
+//    char *basename = get_basename(path);
+//    redisReply *r = NULL;
+//    r = redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s", _g_prefix,
+//                     old_inode, basename);
+//    freeReplyObject(r);
+//    free(basename);
+
     char *basename = get_basename(path);
-    redisReply *r = NULL;
-    r = redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s", _g_prefix,
-                     old_inode, basename);
-    freeReplyObject(r);
-    free(basename);
+    char *old_parent = get_parent(old);
+    char *new_parent = get_parent(path);
+    int old_parent_inode = find_inode(old_parent);
+    int new_parent_inode = find_inode(new_parent);
 
 
-    /**
-     * Find the old parent and remove this file from the set.
-     */
-    char *parent = get_parent(old);
-    parent_inode = find_inode(parent);
-    reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,parent_inode, old_inode);
+    reply =redisCommand(_g_redis, "WATCH  %s:INODE:%d:NAME", _g_prefix,
+                                    old_inode);
     freeReplyObject(reply);
-    free(parent);
 
-    /**
-     * Find the new parent - and add this member to the set.
-     */
-    parent = get_parent(path);
-    parent_inode = find_inode(parent);
+    reply =redisCommand(_g_redis, "MULTI");
+    freeReplyObject(reply);
+
+    reply =redisCommand(_g_redis, "SET %s:INODE:%d:NAME %s", _g_prefix,
+                                old_inode, basename);
+    freeReplyObject(reply);
+    reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,old_parent_inode, old_inode);
+    freeReplyObject(reply);
+
     reply =redisCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
-                     parent_inode, old_inode);
+                         new_parent_inode, old_inode);
     freeReplyObject(reply);
+
+    reply =redisCommand(_g_redis, "EXEC");
+    freeReplyObject(reply);
+
+    free(basename);
+    free(old_parent);
+    free(new_parent);;
     free(parent);
+
+//    /**
+//     * Find the old parent and remove this file from the set.
+//     */
+//    char *parent = get_parent(old);
+//    parent_inode = find_inode(parent);
+//    reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,parent_inode, old_inode);
+//    freeReplyObject(reply);
+//    free(parent);
+
+
+//    /**
+//     * Find the new parent - and add this member to the set.
+//     */
+//    parent = get_parent(path);
+//    parent_inode = find_inode(parent);
+//    reply =redisCommand(_g_redis, "SADD %s:DIRENT:%d %d", _g_prefix,
+//                     parent_inode, old_inode);
+//    freeReplyObject(reply);
+//    free(parent);
 
     pthread_mutex_unlock(&_g_lock);
 
