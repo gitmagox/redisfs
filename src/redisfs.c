@@ -1576,7 +1576,7 @@ int
 fs_rename(const char *old, const char *path, unsigned int flags)
 {
     int old_inode = -1;
-    int parent_inode = 0;
+    //int parent_inode = 0;
     redisReply *reply = NULL;
 
     pthread_mutex_lock(&_g_lock);
@@ -1653,7 +1653,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     free(basename);
     free(old_parent);
     free(new_parent);;
-    free(parent);
+    //free(parent);
 
 //    /**
 //     * Find the old parent and remove this file from the set.
