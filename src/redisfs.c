@@ -1617,9 +1617,11 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     int old_parent_inode=-1;
     int new_parent_inode=-1;
     int same_inode=-1;
+
     old_parent_inode = find_inode(old_parent);
     new_parent_inode = find_inode(new_parent);
     same_inode = find_inode(path);
+
     reply =redisCommand(_g_redis, "WATCH  %s:INODE:%d:NAME", _g_prefix,
                                     old_inode);
     freeReplyObject(reply);
@@ -1627,10 +1629,10 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     reply =redisCommand(_g_redis, "MULTI");
     freeReplyObject(reply);
 
-    if(  same_inode!=-1 )
+    if(  same_inode != -1 )
     {
-        reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,new_parent_inode, same_inode);
-        remove_inode(same_inode);
+        reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix, new_parent_inode, same_inode);
+        //remove_inode(same_inode);
         freeReplyObject(reply);
     }
 
