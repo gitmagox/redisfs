@@ -1631,7 +1631,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     if(same_inode!=-1)
     {
         reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,new_parent_inode, same_inode);
-        remove_inode(same_inode);
+        //remove_inode(same_inode);
         freeReplyObject(reply);
     }
 
