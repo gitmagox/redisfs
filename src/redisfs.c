@@ -1611,15 +1611,20 @@ fs_rename(const char *old, const char *path, unsigned int flags)
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
-    int same_inode = -1;
-    same_inode = find_inode(path);
-
     char *basename = get_basename(path);
     char *old_parent = get_parent(old);
     char *new_parent = get_parent(path);
-    int old_parent_inode = find_inode(old_parent);
-    int new_parent_inode = find_inode(new_parent);
-
+    int old_parent_inode=-1;
+    int new_parent_inode=-1;
+    int same_inode=-1;
+    old_parent_inode = find_inode(old_parent);
+    new_parent_inode = find_inode(new_parent);
+    same_inode = find_inode(path);
+    if (old_parent_inode == -1 || new_parent_inode == -1 )
+    {
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
 
     reply =redisCommand(_g_redis, "WATCH  %s:INODE:%d:NAME", _g_prefix,
                                     old_inode);
@@ -1628,10 +1633,10 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     reply =redisCommand(_g_redis, "MULTI");
     freeReplyObject(reply);
 
-    if(same_inode!=-1)
+    if(  same_inode!=-1 )
     {
         reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix,new_parent_inode, same_inode);
-        //remove_inode(same_inode);
+        remove_inode(same_inode);
         freeReplyObject(reply);
     }
 
