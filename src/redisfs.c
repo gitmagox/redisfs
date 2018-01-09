@@ -1620,12 +1620,6 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     old_parent_inode = find_inode(old_parent);
     new_parent_inode = find_inode(new_parent);
     same_inode = find_inode(path);
-    if (old_parent_inode == -1 || new_parent_inode == -1 )
-    {
-        pthread_mutex_unlock(&_g_lock);
-        return -ENOENT;
-    }
-
     reply =redisCommand(_g_redis, "WATCH  %s:INODE:%d:NAME", _g_prefix,
                                     old_inode);
     freeReplyObject(reply);
