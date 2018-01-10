@@ -2,7 +2,7 @@
 #
 #  Flags and stuffs.
 #
-CFLAGS=-Wall -Werror -O3  `pkg-config fuse3 --cflags` -I. -DVERSION=$(VERSION)
+CFLAGS=-Wall -g -Werror -O3  `pkg-config fuse3 --cflags` -I. -DVERSION=$(VERSION)
 LDFLAGS=`pkg-config fuse3 --libs`
 LDLIBS := $(shell pkg-config fuse3 --libs)
 
@@ -27,11 +27,14 @@ clean:
 	rm -f fmacros.h || true
 	rm -f hiredis.c || true
 	rm -f hiredis.h || true
+	rm -f read.c || true
+	rm -f read.h || true
 	rm -f sds.c || true
 	rm -f sds.h  || true
 	rm -f net.c || true
 	rm -f net.h  || true
 	rm -f util.h  || true
+	rm -f sdsalloc.h || true
 
 #
 #  Install the binary
@@ -51,13 +54,13 @@ tidy:
 #
 #  The filesystem
 #
-redisfs: pathutil.o redisfs.o hiredis.o sds.o net.o
+redisfs: pathutil.o redisfs.o hiredis.o sds.o net.o read.o
 
 
 #
 #  The filesystem snapshot utility
 #
-redisfs-snapshot: pathutil.o redisfs-snapshot.o hiredis.o sds.o net.o
+redisfs-snapshot: pathutil.o redisfs-snapshot.o hiredis.o sds.o net.o read.o 
 
 
 #
@@ -67,6 +70,9 @@ link:
 	ln -sf ../hiredis/fmacros.h .
 	ln -sf ../hiredis/hiredis.c .
 	ln -sf ../hiredis/hiredis.h .
+	ln -sf ../hiredis/read.c .
+	ln -sf ../hiredis/read.h .
+	ln -sf ../hiredis/sdsalloc.h .
 	ln -sf ../hiredis/sds.c .
 	ln -sf ../hiredis/sds.h .
 	ln -sf ../hiredis/net.c .

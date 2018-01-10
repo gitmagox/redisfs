@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2009-2010, Salvatore Sanfilippo <antirez at gmail dot com>
- * Copyright (c) 2010, Pieter Noordhuis <pcnoordhuis at gmail dot com>
+ * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
+ * Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
  *
  * All rights reserved.
  *
@@ -55,7 +55,7 @@ typedef struct redisCallbackList {
 
 /* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
-typedef void (redisConnectCallback)(const struct redisAsyncContext*);
+typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
 
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
@@ -102,8 +102,10 @@ typedef struct redisAsyncContext {
 
 /* Functions that proxy to hiredis */
 redisAsyncContext *redisAsyncConnect(const char *ip, int port);
+redisAsyncContext *redisAsyncConnectBind(const char *ip, int port, const char *source_addr);
+redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
+                                                  const char *source_addr);
 redisAsyncContext *redisAsyncConnectUnix(const char *path);
-int redisAsyncSetReplyObjectFunctions(redisAsyncContext *ac, redisReplyObjectFunctions *fn);
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 void redisAsyncDisconnect(redisAsyncContext *ac);
@@ -118,6 +120,7 @@ void redisAsyncHandleWrite(redisAsyncContext *ac);
 int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
 int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
+int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len);
 
 #ifdef __cplusplus
 }

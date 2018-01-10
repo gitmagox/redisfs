@@ -85,6 +85,7 @@
 #include <stdarg.h>
 
 
+//#include "hiredis.h"
 #include "hiredis.h"
 #include "pathutil.h"
 
@@ -121,7 +122,7 @@ redisContext *_g_redis = NULL;
  * The host and port of the redis server we're connecting to.
  */
 int _g_redis_port = 6379;
-char _g_redis_host[100] = { "localhost" };
+char _g_redis_host[100] = { "127.0.0.1" };
 char _g_redis_password[100] = { "123456" };
 
 /**
@@ -150,13 +151,14 @@ int _g_read_only = 0;
 void
 redis_alive()
 {
-    struct timeval timeout = { 1, 5000000 };    // 5 seconds
+    //struct timeval timeout = { 1, 5000000 };    // 5 seconds
+    struct timeval timeout = { 1, 5000000 };
     redisReply *reply = NULL;
 
     /**
      * If we have a handle see if it is alive.
      */
-    if (_g_redis != NULL)
+    if (_g_redis != NULL && _g_redis->errstr!= NULL )
     {
         reply = redisCommand(_g_redis, "PING");
 
@@ -177,10 +179,16 @@ redis_alive()
      * OK we have no handle, create a connection to the server.
      */
     _g_redis = redisConnectWithTimeout(_g_redis_host, _g_redis_port, timeout);
-    if (_g_redis == NULL)
+    if (_g_redis == NULL || _g_redis -> err)
     {
-        fprintf(stderr, "Failed to connect to redis on [%s:%d].\n",
-                _g_redis_host, _g_redis_port);
+	if (_g_redis) {
+	    fprintf(stderr, "Failedi to connect to redis on :[%s]",
+                _g_redis->errstr);
+	    redisFree(_g_redis);
+	}else{
+	    fprintf(stderr, "Failed to connect to redis on [%s:%d].\n",
+            _g_redis_host, _g_redis_port);
+	}
         exit(1);
     }
     else
