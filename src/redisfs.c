@@ -163,7 +163,8 @@ redis_alive()
         reply = redisCommand(_g_redis, "PING");
 
         if ((reply != NULL) &&
-            (reply->str != NULL) && (strcmp(reply->str, "PONG") == 0))
+            (reply->str != NULL) &&
+            ((strcmp(reply->str, "PONG") == 0)||(strcmp(reply->str, "QUEUED") == 0)))
         {
             freeReplyObject(reply);
             return;
