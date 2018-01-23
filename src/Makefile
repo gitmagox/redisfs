@@ -35,6 +35,7 @@ clean:
 	rm -f net.h  || true
 	rm -f util.h  || true
 	rm -f sdsalloc.h || true
+	rm -f redisLock.h || true
 
 #
 #  Install the binary
@@ -54,13 +55,13 @@ tidy:
 #
 #  The filesystem
 #
-redisfs: pathutil.o redisfs.o hiredis.o sds.o net.o read.o
+redisfs: pathutil.o redisfs.o  hiredis.o sds.o net.o read.o
 
 
 #
 #  The filesystem snapshot utility
 #
-redisfs-snapshot: pathutil.o redisfs-snapshot.o hiredis.o sds.o net.o read.o 
+redisfs-snapshot: pathutil.o redisfs-snapshot.o  hiredis.o sds.o net.o read.o
 
 
 #
@@ -78,5 +79,5 @@ link:
 	ln -sf ../hiredis/net.c .
 	ln -sf ../hiredis/net.h .
 	ln -sf ../hiredis/util.h .
-
+	ln -sf ../redis_lock/redisLock.h
 

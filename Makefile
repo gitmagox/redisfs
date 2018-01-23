@@ -36,8 +36,11 @@ install: all
 
 refresh:
 	rm -rf ./hiredis/
+	rm -rf ./redis_lock/
 	git clone https://github.com/redis/hiredis.git
+	git clone https://github.com/gitmagox/redis_lock.git
 	rm -rf ./hiredis/.git*
+	rm -rf ./redis_lock/.git*
 
 #
 #  Make a new release tarball, and make a GPG signature.

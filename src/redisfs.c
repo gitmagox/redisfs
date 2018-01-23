@@ -88,6 +88,7 @@
 //#include "hiredis.h"
 #include "hiredis.h"
 #include "pathutil.h"
+#include "redisLock.h"
 
 
 
@@ -161,9 +162,9 @@ redis_alive()
     if (_g_redis != NULL && _g_redis->errstr!= NULL )
     {
         reply = redisCommand(_g_redis, "PING");
-
         if ((reply != NULL) &&
-            (reply->str != NULL) && (strcmp(reply->str, "PONG") == 0))
+            (reply->str != NULL) &&
+            ((strcmp(reply->str, "PONG") == 0)||(strcmp(reply->str, "QUEUED") == 0)))
         {
             freeReplyObject(reply);
             return;
@@ -1630,6 +1631,13 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     new_parent_inode = find_inode(new_parent);
     same_inode = find_inode(path);
 
+    char lock_str[100];
+    sprintf(lock_str, "%sINODE%dNAME", _g_prefix,old_inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
     reply =redisCommand(_g_redis, "WATCH  %s:INODE:%d:NAME", _g_prefix,
                                     old_inode);
     freeReplyObject(reply);
@@ -1640,7 +1648,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     if(  same_inode != -1 )
     {
         reply =redisCommand(_g_redis, "SREM %s:DIRENT:%d %d", _g_prefix, new_parent_inode, same_inode);
-        //remove_inode(same_inode);
+        remove_inode(same_inode);
         freeReplyObject(reply);
     }
 
@@ -1655,7 +1663,9 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     freeReplyObject(reply);
 
     reply =redisCommand(_g_redis, "EXEC");
+
     freeReplyObject(reply);
+    magox_redis_unlock( lock_str );
 
     free(basename);
     free(old_parent);
@@ -1911,6 +1921,9 @@ main(int argc, char *argv[])
             snprintf(_g_mount, sizeof(_g_mount) - 1, "%s", optarg);
             break;
         case 'a':
+#ifdef MAGOX_REDIS_LOCK_H
+            snprintf(_m_redis_password, sizeof(_m_redis_password) - 1, "%s", optarg);
+#endif
             snprintf(_g_redis_password, sizeof(_g_redis_password) - 1, "%s", optarg);
             break;
         case 'd':
