@@ -1144,7 +1144,7 @@ fs_symlink(const char *target, const char *path)
 
     free(parent);
     free(entry);
-    magox_redis_ulock( lock_str );
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
