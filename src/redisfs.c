@@ -733,6 +733,14 @@ fs_mkdir(const char *path, mode_t mode)
     new_inode = get_next_inode();
     parent_inode = find_inode(parent);
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            new_inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
+
     /**
      * Add the entry to the parent directory.
      */
@@ -761,7 +769,7 @@ fs_mkdir(const char *path, mode_t mode)
 
     free(parent);
     free(entry);
-
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -831,6 +839,14 @@ fs_rmdir(const char *path)
         return -ENOENT;
     }
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
     /**
      * [3/4] Remove from the directory of the parent.
      */
@@ -845,7 +861,7 @@ fs_rmdir(const char *path)
      */
     remove_inode(inode);
 
-
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -875,9 +891,18 @@ fs_write(const char *path,
         return -EPERM;
     }
 
+
     redis_alive();
 
     int inode = find_inode(path);
+
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
 
     /**
      * Simplest case first.
@@ -945,6 +970,7 @@ fs_write(const char *path,
 
     }
 
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return size;
 }
@@ -1070,6 +1096,13 @@ fs_symlink(const char *target, const char *path)
 
     entry = get_basename(path);
     key = get_next_inode();
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            key);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
 
 
     /**
@@ -1111,7 +1144,7 @@ fs_symlink(const char *target, const char *path)
 
     free(parent);
     free(entry);
-
+    magox_redis_ulock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -1250,6 +1283,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
         pthread_mutex_unlock(&_g_lock);
         return 0;
     }
+
     /**
      * We need to create a new INODE number & entry.
      *
@@ -1262,6 +1296,13 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     entry = get_basename(path);
     key = get_next_inode();
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            key);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
 
     /**
      * Add the entry to the parent directory.
@@ -1290,7 +1331,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
     free(parent);
     free(entry);
-
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -1335,6 +1376,13 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
         return -ENOENT;
     }
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
     /**
      * [2/2] Change the UID, GID, mtime
      */
@@ -1345,6 +1393,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
                      inode, time(NULL));
     freeReplyObject(reply);
 
+    magox_redis_unlock( lock_str );
     /**
      * All done.
      */
@@ -1393,6 +1442,14 @@ fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
         return -ENOENT;
     }
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
+
     /**
      * [2/2] Change the mode
      */
@@ -1405,6 +1462,7 @@ fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
     /**
      * All done.
      */
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 
@@ -1448,6 +1506,13 @@ fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -EPERM;
+    }
 
     /**
      * [2/2] Change the time
@@ -1459,6 +1524,7 @@ fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *
                      tv[1].tv_sec);
     freeReplyObject(reply);
 
+    magox_redis_unlock( lock_str );
     /**
      * All done.
      */
@@ -1552,7 +1618,13 @@ fs_unlink(const char *path)
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
-
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
     /**
      * [2/4] Remove from the parent set.
      */
@@ -1569,6 +1641,8 @@ fs_unlink(const char *path)
      * [4/4] Remove all meta-data.
      */
     remove_inode(inode);
+
+    magox_redis_unlock( lock_str );
 
     pthread_mutex_unlock(&_g_lock);
     return 0;
@@ -1629,7 +1703,8 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     same_inode = find_inode(path);
 
     char lock_str[100];
-    sprintf(lock_str, "%sINODE%dNAME", _g_prefix,old_inode);
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
+            old_inode);
     if(magox_redis_lock( lock_str )!=0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
@@ -1726,6 +1801,12 @@ fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
         return -ENOENT;
     }
 
+    char lock_str[100];
+    sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix, inode);
+    if(magox_redis_lock( lock_str )!=0){
+        pthread_mutex_unlock(&_g_lock);
+        return -ENOENT;
+    }
     /**
      * [2/3] Remove the data associated with the file.
      */
@@ -1739,7 +1820,7 @@ fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
         redisCommand(_g_redis, "MSET %s:INODE:%d:SIZE 0 %s:INODE:%d:MTIME %d",
                      _g_prefix, inode, _g_prefix, inode, time(NULL));
     freeReplyObject(reply);
-
+    magox_redis_unlock( lock_str );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
