@@ -185,7 +185,7 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
-        if (timeout->tv_usec > 10000000 || timeout->tv_sec > __MAX_MSEC) {
+        if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
             *result = msec;
             return REDIS_ERR;
         }
