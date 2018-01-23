@@ -150,7 +150,7 @@ void
 redis_alive()
 {
     //struct timeval timeout = { 1, 5000000 };    // 5 seconds
-    struct timeval timeout = { 1, 5000000 };
+    struct timeval timeout = { 5, 1000000 };
     redisReply *reply = NULL;
 
     /**
