@@ -83,9 +83,6 @@
 #include <netinet/in.h>
 #include <getopt.h>
 #include <stdarg.h>
-
-
-//#include "hiredis.h"
 #include "hiredis.h"
 #include "pathutil.h"
 #include "redisLock.h"
@@ -1906,6 +1903,9 @@ main(int argc, char *argv[])
             snprintf(_g_prefix, sizeof(_g_prefix) - 1, "%s", optarg);
             break;
         case 'P':
+#ifdef MAGOX_REDIS_LOCK_H
+            _m_redis_port = atoi(optarg);
+#endif
             _g_redis_port = atoi(optarg);
             break;
         case 'f':
@@ -1915,6 +1915,9 @@ main(int argc, char *argv[])
             _g_read_only = 1;
             break;
         case 's':
+#ifdef MAGOX_REDIS_LOCK_H
+            snprintf(_m_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
+#endif
             snprintf(_g_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
             break;
         case 'm':
