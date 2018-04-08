@@ -1225,7 +1225,8 @@ fs_open(const char *path, struct fuse_file_info *fi)
         return 0;
 
     pthread_mutex_lock(&_g_lock);
-
+    
+    redis_alive();
   /**
    * Update the access time of a file.
    */
@@ -1557,7 +1558,7 @@ fs_access(const char *path, int mode)
 
 
     pthread_mutex_lock(&_g_lock);
-
+    redis_alive();
   /**
    * Update the access time of a file.
    */
