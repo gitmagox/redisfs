@@ -150,7 +150,7 @@ void
 redis_alive()
 {
     //struct timeval timeout = { 1, 5000000 };    // 5 seconds
-    struct timeval timeout = { 5, 1000000 };
+    struct timeval timeout = { 5, 100000 };
     redisReply *reply = NULL;
 
     /**
@@ -1998,7 +1998,7 @@ main(int argc, char *argv[])
             break;
         case 's':
 #ifdef MAGOX_REDIS_LOCK_H
-            snprintf(_m_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
+            snprintf(_m_redis_host, sizeof(_m_redis_host) - 1, "%s", optarg);
 #endif
             snprintf(_g_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
             break;
