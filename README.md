@@ -94,16 +94,22 @@ the same host - if you wish to connect to a remote machine please execute:
 
      # ./src/redisfs --host remote.example.org [--port=6379][--password=redispassword]
 
-
-Steve
---
-
-此fock更新说明--magox
+更新说明--magox
 ---------------
 1.修改文件重命名不能复盖已有文件的bug;
-2.更新最新的hiredis客户端,支持fuse版本30以上;
-3.增加redis密码验证[--password=redispassword];
-3.增加分布式redis锁机制,由原来的一写多读,升级为可多机写;
 
-建意:配合redis集群使用;
+2.更新最新的hiredis客户端,支持fuse版本30以上;
+
+3.增加redis密码验证[--password=redispassword];
+
+4.增加分布式redis锁机制,由原来的一写多读,升级为可多机写;
+
+如何使用:(需要有C语言基础)
+---------------
+1.安装libfuse https://github.com/libfuse/libfuse;
+
+2.调整锁的超时，适配项目 https://github.com/gitmagox/redisfs/blob/master/redis_lock/redisLock.h   :int _locking_sleep = 1000000;
+
+建意:
 --
+配合redis集群使用
