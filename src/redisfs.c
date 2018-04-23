@@ -1958,6 +1958,7 @@ main(int argc, char *argv[])
             {"mount", required_argument, 0, 'm'},
             {"port", required_argument, 0, 'P'},
             {"password",required_argument, 0, 'a'},
+            {"locktimeout",required_argument, 0, 'l'},
             {"prefix", required_argument, 0, 'p'},
             {"read-only", no_argument, 0, 'r'},
             {"version", no_argument, 0, 'v'},
@@ -2001,6 +2002,11 @@ main(int argc, char *argv[])
             snprintf(_m_redis_host, sizeof(_m_redis_host) - 1, "%s", optarg);
 #endif
             snprintf(_g_redis_host, sizeof(_g_redis_host) - 1, "%s", optarg);
+            break;
+        case 'l':
+#ifdef MAGOX_REDIS_LOCK_H
+            _locking_sleep = atoi(optarg);
+#endif
             break;
         case 'm':
             snprintf(_g_mount, sizeof(_g_mount) - 1, "%s", optarg);
