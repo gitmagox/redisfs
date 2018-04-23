@@ -92,7 +92,7 @@ software, via:
 By default this will attempt to connect to a redis server running upon
 the same host - if you wish to connect to a remote machine please execute:
 
-     # ./src/redisfs --host remote.example.org [--port=6379][--password=redispassword]
+     # ./src/redisfs --host remote.example.org [--port=6379][--password=redispassword][--locktimeout=100000]
 
 更新说明--magox
 ---------------
@@ -108,7 +108,19 @@ the same host - if you wish to connect to a remote machine please execute:
 ---------------
 1.安装libfuse https://github.com/libfuse/libfuse;
 
-2.调整锁的超时，适配项目 https://github.com/gitmagox/redisfs/blob/master/redis_lock/redisLock.h   :int _locking_sleep = 1000000;
+2.调整锁的超时，适配项目 https://github.com/gitmagox/redisfs/blob/master/redis_lock/redisLock.h;
+
+3.命令例子:./src/redisfs --host localhost --port=6379 --password=redispassword --locktimeout=100000 --mount=/mnt/redis
+* 参数说明：
+
+参数|是否必选|说明|
+---|---|---|
+*host*|是|redis服务器
+*port*|是|redis端口
+*password*|是|redis密码
+*locktimeout*|是|分布式锁超时时间
+*mount*|是|挂载目录 
+
 
 建意:
 --
