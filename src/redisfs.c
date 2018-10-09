@@ -129,6 +129,9 @@ char _g_redis_password[100] = { "123456" };
 int _g_debug = 0;
 
 
+int _g_redis_auth = 0;
+
+
 /**
  * Are we running with --fast in play?
  */
@@ -195,13 +198,16 @@ redis_alive()
             fprintf(stderr, "Reconnected to redis server on [%s:%d]\n",
                     _g_redis_host, _g_redis_port);
 
-        reply= redisCommand(_g_redis, "AUTH %s", _g_redis_password);
-        if (reply->type == REDIS_REPLY_ERROR) {
-           fprintf(stderr, "password is wrong [%s] check it right.\n",
-                           _g_redis_password);
-                   exit(1);
+        if(_g_redis_auth){
+            reply= redisCommand(_g_redis, "AUTH %s", _g_redis_password);
+            if (reply->type == REDIS_REPLY_ERROR) {
+               fprintf(stderr, "password is wrong [%s] check it right.\n",
+                               _g_redis_password);
+                       exit(1);
+            }
+            freeReplyObject(reply);
         }
-        freeReplyObject(reply);
+        
     }
 }
 
@@ -2014,8 +2020,10 @@ main(int argc, char *argv[])
         case 'a':
 #ifdef MAGOX_REDIS_LOCK_H
             snprintf(_m_redis_password, sizeof(_m_redis_password) - 1, "%s", optarg);
+            _m_redis_is_auth = 1;
 #endif
             snprintf(_g_redis_password, sizeof(_g_redis_password) - 1, "%s", optarg);
+            _g_redis_auth = 1;
             break;
         case 'd':
           /**
