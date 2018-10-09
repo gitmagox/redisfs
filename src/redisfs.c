@@ -742,7 +742,11 @@ fs_mkdir(const char *path, mode_t mode)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             new_inode);
-    if(magox_redis_lock( lock_str )!=0){
+
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -EPERM;
     }
@@ -775,7 +779,7 @@ fs_mkdir(const char *path, mode_t mode)
 
     free(parent);
     free(entry);
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str ,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -848,7 +852,11 @@ fs_rmdir(const char *path)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -867,7 +875,7 @@ fs_rmdir(const char *path)
      */
     remove_inode(inode);
 
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -905,7 +913,10 @@ fs_write(const char *path,
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -EPERM;
     }
@@ -976,7 +987,7 @@ fs_write(const char *path,
 
     }
 
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return size;
 }
@@ -1105,7 +1116,10 @@ fs_symlink(const char *target, const char *path)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             key);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -EPERM;
     }
@@ -1150,7 +1164,7 @@ fs_symlink(const char *target, const char *path)
 
     free(parent);
     free(entry);
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -1306,7 +1320,10 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             key);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -EPERM;
     }
@@ -1338,7 +1355,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
     free(parent);
     free(entry);
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str ,lock_time);
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
@@ -1386,7 +1403,10 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -1400,7 +1420,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
                      inode, time(NULL));
     freeReplyObject(reply);
 
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     /**
      * All done.
      */
@@ -1452,7 +1472,10 @@ fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -1469,7 +1492,7 @@ fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
     /**
      * All done.
      */
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 
@@ -1516,7 +1539,10 @@ fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -EPERM;
     }
@@ -1531,7 +1557,7 @@ fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *
                      tv[1].tv_sec);
     freeReplyObject(reply);
 
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     /**
      * All done.
      */
@@ -1628,7 +1654,10 @@ fs_unlink(const char *path)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -1649,7 +1678,7 @@ fs_unlink(const char *path)
      */
     remove_inode(inode);
 
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str ,lock_time);
 
     pthread_mutex_unlock(&_g_lock);
     return 0;
@@ -1712,7 +1741,10 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             old_inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -1744,7 +1776,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     reply =redisCommand(_g_redis, "EXEC");
 
     freeReplyObject(reply);
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
 
     free(basename);
     free(old_parent);
@@ -1810,7 +1842,10 @@ fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
 
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix, inode);
-    if(magox_redis_lock( lock_str )!=0){
+    int lock_time;
+    lock_time = magox_redis_lock( lock_str )
+
+    if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
         return -ENOENT;
     }
@@ -1827,7 +1862,7 @@ fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
         redisCommand(_g_redis, "MSET %s:INODE:%d:SIZE 0 %s:INODE:%d:MTIME %d",
                      _g_prefix, inode, _g_prefix, inode, time(NULL));
     freeReplyObject(reply);
-    magox_redis_unlock( lock_str );
+    magox_redis_unlock( lock_str,lock_time );
     pthread_mutex_unlock(&_g_lock);
     return 0;
 }
