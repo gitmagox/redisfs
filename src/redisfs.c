@@ -744,7 +744,7 @@ fs_mkdir(const char *path, mode_t mode)
             new_inode);
 
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -854,7 +854,7 @@ fs_rmdir(const char *path)
             inode);
 
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -914,7 +914,7 @@ fs_write(const char *path,
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1117,7 +1117,7 @@ fs_symlink(const char *target, const char *path)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             key);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1321,7 +1321,7 @@ fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             key);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1404,7 +1404,7 @@ fs_chown(const char *path, uid_t uid, gid_t gid,struct fuse_file_info *fi)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1473,7 +1473,7 @@ fs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1540,7 +1540,7 @@ fs_utimens(const char *path, const struct timespec tv[2],struct fuse_file_info *
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1655,7 +1655,7 @@ fs_unlink(const char *path)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1742,7 +1742,7 @@ fs_rename(const char *old, const char *path, unsigned int flags)
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix,
             old_inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
@@ -1843,7 +1843,7 @@ fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
     char lock_str[100];
     sprintf(lock_str, "%sPREFIX%dINODE", _g_prefix, inode);
     int lock_time;
-    lock_time = magox_redis_lock( lock_str )
+    lock_time = magox_redis_lock( lock_str );
 
     if(lock_time==0){
         pthread_mutex_unlock(&_g_lock);
