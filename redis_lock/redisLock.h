@@ -26,7 +26,7 @@ redisContext *_m_redis_c = NULL;
  * redis host and password
  */
 //是否验证密码
-int _m_redis_is_auth = 1;
+int _m_redis_is_auth = 0;
 int _m_redis_port = 6379;
 char _m_redis_host[100] = { "127.0.0.1" };
 char _m_redis_password[100] = { "123456" };
@@ -43,7 +43,31 @@ void magox_redis_keep_alive();
 int get_millisecond_time(struct timeval *second_times);
 int get_now_millisecond_time();
 int magox_redis_lock( char *key_name );
-int magox_redis_unlock( char *key_name );
+int magox_redis_unlock( char *key_name,int old_time );
+
+
+void ltrim ( char *s )
+{
+    char *p;
+    p = s;
+    while ( *p == ' ' || *p == '\t'  || *p == '\"' ){p++;}
+    strcpy ( s,p );
+}
+ 
+void rtrim ( char *s )
+{
+    int i;
+ 
+    i = strlen ( s )-1;
+    while ( ( s[i] == ' ' || s[i] == '\t' || s[i] == '\"' ) && i >= 0 ) {i--;};
+    s[i+1] = '\0';
+}
+ 
+void trim ( char *s )
+{
+    ltrim ( s );
+    rtrim ( s );
+}
 
 
 /**
@@ -73,7 +97,6 @@ get_now_millisecond_time()
 int
 magox_redis_lock( char *key_name )
 {
-    char setnx_millisecond_time_char[15];
 
     redisReply *reply = NULL;
 
@@ -82,22 +105,24 @@ magox_redis_lock( char *key_name )
 
     int     begin_time,
             setnx_millisecond_time,
-            now_time,
-            back_setnx_time;
+            back_setnx_time,
+            lock_time,
+            result_value;
 
+    result_value = 0;
     begin_time = get_now_millisecond_time();
+    lock_time = get_millisecond_time(&doing_timeout);
     magox_redis_keep_alive();
 
-    while ( get_now_millisecond_time() < (begin_time+get_millisecond_time(&doing_timeout))){
+    while ( get_now_millisecond_time() < (begin_time+lock_time) ){
         //try to get a lock
-        setnx_millisecond_time = get_now_millisecond_time()+get_millisecond_time(&doing_timeout);
-
-        snprintf(setnx_millisecond_time_char, 15, "%d", setnx_millisecond_time);
+        setnx_millisecond_time = get_now_millisecond_time()+lock_time;
 
         reply = redisCommand(_m_redis_c,"SETNX %s:lock:%s \"%d\"",&_lock_prefix,key_name,setnx_millisecond_time);
 
         if( reply!=NULL && reply->integer==1)
         {
+            result_value = setnx_millisecond_time;
             freeReplyObject(reply);
             break;
         }
@@ -106,20 +131,22 @@ magox_redis_lock( char *key_name )
 
         if( reply!=NULL && reply->str!=NULL )
         {
+            trim(reply->str);
             back_setnx_time = atoi(reply->str);
 
             freeReplyObject(reply);
 
-            now_time = get_now_millisecond_time();
+            setnx_millisecond_time = get_now_millisecond_time()+lock_time;
 
             //if back time > timeout
-            if(now_time>back_setnx_time)
+            if(setnx_millisecond_time>back_setnx_time)
             {
                 //doing getset;
-                reply = redisCommand(_m_redis_c,"GETSET %s:lock:%s %d",&_lock_prefix,key_name,now_time);
+                reply = redisCommand(_m_redis_c,"GETSET %s:lock:%s %d",&_lock_prefix,key_name,setnx_millisecond_time);
 
-                if( reply->type == REDIS_REPLY_NIL )
+                if( reply!=NULL && reply->integer==1)
                 {
+                    result_value = setnx_millisecond_time;
                     freeReplyObject(reply);
                     break;
                 }
@@ -127,13 +154,14 @@ magox_redis_lock( char *key_name )
         }
         continue;
     }
-    return 0;
+
+    return result_value;
 }
 /**
  * 解锁
  */
 int
-magox_redis_unlock( char *key_name )
+magox_redis_unlock( char *key_name, int old_time)
 {
     redisReply *reply = NULL;
     magox_redis_keep_alive();
@@ -141,26 +169,21 @@ magox_redis_unlock( char *key_name )
 
     reply = redisCommand(_m_redis_c,"GET %s:lock:%s",&_lock_prefix,key_name);
 
-
     if( reply!=NULL && reply->str!=NULL )
     {
+        trim(reply->str);
         back_setnx_time = atoi(reply->str);
-
         freeReplyObject(reply);
-
-        while ( get_now_millisecond_time() < back_setnx_time )
-        {
+        if(old_time==back_setnx_time){
             //doing unlock;
             reply = redisCommand(_m_redis_c,"DEL %s:lock:%s",&_lock_prefix,key_name);
             //del ok return
             if( reply!=NULL && reply->integer==1)
             {
                 freeReplyObject(reply);
-                break;
+                return 0;
             }
-            continue;
         }
-        
     }
     return 0;
 }
