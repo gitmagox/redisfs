@@ -2,7 +2,7 @@
 #
 #  Flags and stuffs.
 #
-CFLAGS=-Wall -g -Werror -O3  `pkg-config fuse3 --cflags` -I. -DVERSION=$(VERSION)
+CFLAGS=-Wall -g -Werror -O0  `pkg-config fuse3 --cflags` -I. -DVERSION=$(VERSION)
 LDFLAGS=`pkg-config fuse3 --libs`
 LDLIBS := $(shell pkg-config fuse3 --libs)
 
